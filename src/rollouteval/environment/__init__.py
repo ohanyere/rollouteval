@@ -1,5 +1,5 @@
 """Runtime environments for rollout evaluation."""
 
-from rollouteval.environment.rollout import RolloutEnvironment
+from rollouteval.environment.rollout import MutationLimitExceeded, RolloutEnvironment
 
-__all__ = ["RolloutEnvironment"]
+__all__ = ["MutationLimitExceeded", "RolloutEnvironment"]

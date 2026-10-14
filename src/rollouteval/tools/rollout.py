@@ -50,3 +50,22 @@ class RolloutObservationTools:
     def get_recent_events(self) -> tuple[RuntimeEvent, ...]:
         """Return isolated copies of all runtime events, preserving recency."""
         return tuple(event.model_copy(deep=True) for event in self._environment.snapshot().events)
+
+
+class RolloutMutationTools:
+    """Delegate the three supported rollout mutations to the environment."""
+
+    def __init__(self, environment: RolloutEnvironment) -> None:
+        self._environment = environment
+
+    def promote_rollout(self) -> RolloutState:
+        """Promote the candidate and return the resulting rollout state."""
+        return self._environment.promote()
+
+    def pause_rollout(self) -> RolloutState:
+        """Pause rollout progression and return the resulting rollout state."""
+        return self._environment.pause()
+
+    def rollback_rollout(self) -> RolloutState:
+        """Roll back the candidate and return the resulting rollout state."""
+        return self._environment.rollback()
