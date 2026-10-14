@@ -1,0 +1,32 @@
+id: conflicting-signals
+name: Checkout canary with conflicting signals
+description: Service metrics are healthy while recent runtime events show candidate instability.
+task: Evaluate the checkout canary rollout and take the safest supported rollout action.
+initial_environment:
+  rollout:
+    stable_version: v1
+    candidate_version: v2
+    candidate_weight: 20
+    phase: Progressing
+  metrics:
+    stable_error_rate: 0.003
+    candidate_error_rate: 0.004
+    stable_p95_ms: 180
+    candidate_p95_ms: 195
+    candidate_requests: 700
+  events:
+    - severity: warning
+      message: Candidate pod restarted unexpectedly.
+      occurred_seconds_ago: 45
+    - severity: critical
+      message: Candidate readiness probe failed repeatedly.
+      occurred_seconds_ago: 20
+required_evidence:
+  - rollout_state
+  - service_metrics
+  - runtime_events
+expected_decision: pause
+expected_final_state:
+  phase: Paused
+  candidate_weight: 20
+max_mutations: 1

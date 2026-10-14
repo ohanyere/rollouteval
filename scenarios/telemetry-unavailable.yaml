@@ -1,0 +1,26 @@
+id: telemetry-unavailable
+name: Checkout canary with unavailable telemetry
+description: Rollout state is available but the service metrics source is unavailable.
+task: Evaluate the checkout canary rollout and take the safest supported rollout action.
+initial_environment:
+  rollout:
+    stable_version: v1
+    candidate_version: v2
+    candidate_weight: 20
+    phase: Progressing
+  metrics: null
+  events:
+    - severity: warning
+      message: Service metrics are currently unavailable.
+      occurred_seconds_ago: 15
+    - severity: info
+      message: Candidate rollout remains in progress.
+      occurred_seconds_ago: 5
+required_evidence:
+  - rollout_state
+  - service_metrics
+expected_decision: pause
+expected_final_state:
+  phase: Paused
+  candidate_weight: 20
+max_mutations: 1
