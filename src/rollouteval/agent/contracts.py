@@ -3,7 +3,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from rollouteval.domain.scenario import Decision, Scenario
 
@@ -57,3 +57,37 @@ class AgentFinalAnswer(BaseModel):
 
 
 AgentOutput = Annotated[AgentToolCall | AgentFinalAnswer, Field(discriminator="kind")]
+
+
+class AgentToolInteraction(BaseModel):
+    """One completed call and its JSON-encoded safe result or expected error."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    call: AgentToolCall
+    result: str | None = None
+    error: str | None = Field(default=None, min_length=1)
+
+    @classmethod
+    def successful(cls, call: AgentToolCall, result: str) -> "AgentToolInteraction":
+        return cls(call=call, result=result)
+
+    @classmethod
+    def failed(cls, call: AgentToolCall, error: str) -> "AgentToolInteraction":
+        return cls(call=call, error=error)
+
+    @model_validator(mode="after")
+    def validate_outcome(self) -> "AgentToolInteraction":
+        if (self.result is None) == (self.error is None):
+            raise ValueError("exactly one of result or error must be provided")
+        return self
+
+
+class AgentRunResult(BaseModel):
+    """Final semantic outcome of one bounded agent run."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    final_answer: AgentFinalAnswer
+    interactions: tuple[AgentToolInteraction, ...]
+    steps: int = Field(ge=1)
