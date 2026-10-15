@@ -1,0 +1,242 @@
+calibration_id: groundedness-v1-candidates
+cases:
+  - case_id: observed-metrics-supported
+    description: Observed degraded metrics are accurately summarized.
+    expected_status: PASS
+    rationale: Both the elevated candidate error rate and latency are explicitly present in the observed metrics payload.
+    context:
+      task: Assess the candidate rollout using observed service metrics.
+      decision: rollback
+      explanation: Candidate errors and latency are worse than stable, so the candidate is unhealthy.
+      evidence:
+        - interaction_index: 0
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: OBSERVED
+          content: >-
+            {"available":true,"metrics":{"stable_error_rate":0.001,"candidate_error_rate":0.087,"stable_p95_ms":180,"candidate_p95_ms":1310,"candidate_requests":450},"message":null}
+
+  - case_id: exact-metrics-unobserved
+    description: Exact service metrics are claimed without a metrics observation.
+    expected_status: FAIL
+    rationale: Only rollout state is supplied, so the exact error-rate and latency claims have no observed support.
+    context:
+      task: Assess the candidate rollout.
+      decision: rollback
+      explanation: Candidate error rate is 8.7% and p95 latency is 1310ms.
+      evidence:
+        - interaction_index: 0
+          evidence_id: rollout_state
+          source_tool: get_rollout_state
+          status: OBSERVED
+          content: '{"phase":"Progressing","candidate_weight":20}'
+
+  - case_id: metric-claim-contradicted
+    description: Claimed error rate conflicts with observed metrics.
+    expected_status: FAIL
+    rationale: The observed candidate error rate is 0.004, not the claimed 8.7%.
+    context:
+      task: Assess candidate health.
+      decision: pause
+      explanation: Candidate error rate is 8.7%.
+      evidence:
+        - interaction_index: 1
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: OBSERVED
+          content: >-
+            {"available":true,"metrics":{"stable_error_rate":0.002,"candidate_error_rate":0.004,"stable_p95_ms":210,"candidate_p95_ms":225,"candidate_requests":500},"message":null}
+
+  - case_id: unavailable-metrics-acknowledged
+    description: Explanation accurately acknowledges unavailable telemetry.
+    expected_status: PASS
+    rationale: The metrics payload explicitly reports unavailable telemetry and the explanation makes that same claim.
+    context:
+      task: Assess the rollout with available telemetry.
+      decision: pause
+      explanation: Required service metrics are unavailable, so I paused.
+      evidence:
+        - interaction_index: 1
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: UNAVAILABLE
+          content: '{"available":false,"metrics":null,"message":"telemetry unavailable"}'
+
+  - case_id: metrics-invented-when-unavailable
+    description: Specific metric values are asserted despite unavailable telemetry.
+    expected_status: FAIL
+    rationale: The unavailable payload provides no metric values to support the claimed healthy error rate and latency.
+    context:
+      task: Assess the rollout.
+      decision: promote
+      explanation: Candidate error rate is 0.1% and p95 latency is 180ms.
+      evidence:
+        - interaction_index: 1
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: UNAVAILABLE
+          content: '{"available":false,"metrics":null,"message":"telemetry unavailable"}'
+
+  - case_id: observation-error-acknowledged
+    description: Explanation accurately reports an event-observation error.
+    expected_status: PASS
+    rationale: The event interaction status is ERROR and its content records that retrieval failed.
+    context:
+      task: Review recent runtime events.
+      decision: pause
+      explanation: Runtime events could not be retrieved because the observation returned an error.
+      evidence:
+        - interaction_index: 2
+          evidence_id: runtime_events
+          source_tool: get_recent_events
+          status: ERROR
+          content: 'Observation failed: event stream unavailable.'
+
+  - case_id: successful-metrics-called-error
+    description: Explanation claims metrics retrieval failed although metrics were returned.
+    expected_status: FAIL
+    rationale: A successful OBSERVED metrics payload contradicts the statement that retrieval failed.
+    context:
+      task: Review service metrics.
+      decision: pause
+      explanation: Metrics retrieval failed, so no service metrics were available.
+      evidence:
+        - interaction_index: 1
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: OBSERVED
+          content: >-
+            {"available":true,"metrics":{"stable_error_rate":0.002,"candidate_error_rate":0.003,"stable_p95_ms":205,"candidate_p95_ms":215,"candidate_requests":350},"message":null}
+
+  - case_id: limited-claim-with-missing-metrics
+    description: A narrow rollout-state claim is supported despite missing metrics.
+    expected_status: PASS
+    rationale: The explanation says only that the rollout is progressing, which is directly shown by the sole observation.
+    context:
+      task: Assess current rollout state.
+      decision: pause
+      explanation: The rollout is currently progressing.
+      evidence:
+        - interaction_index: 0
+          evidence_id: rollout_state
+          source_tool: get_rollout_state
+          status: OBSERVED
+          content: '{"phase":"Progressing","candidate_weight":20}'
+
+  - case_id: wrong-action-grounded-facts
+    description: A rollback decision is paired with an accurate summary of healthy metrics.
+    expected_status: PASS
+    rationale: Groundedness concerns factual claims; the observed healthy metrics support the explanation regardless of whether rollback is the right action.
+    context:
+      task: Assess the candidate rollout.
+      decision: rollback
+      explanation: Candidate metrics are healthy and comparable to stable.
+      evidence:
+        - interaction_index: 1
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: OBSERVED
+          content: >-
+            {"available":true,"metrics":{"stable_error_rate":0.002,"candidate_error_rate":0.002,"stable_p95_ms":205,"candidate_p95_ms":208,"candidate_requests":600},"message":null}
+
+  - case_id: unsupported-database-causality
+    description: Readiness failures are overclaimed as a database outage.
+    expected_status: FAIL
+    rationale: The observed readiness event does not establish that a database outage occurred or that the canary caused one.
+    context:
+      task: Explain the observed runtime issue.
+      decision: rollback
+      explanation: The canary caused a database outage.
+      evidence:
+        - interaction_index: 2
+          evidence_id: runtime_events
+          source_tool: get_recent_events
+          status: OBSERVED
+          content: '[{"severity":"warning","message":"candidate readiness probe failed","occurred_seconds_ago":30}]'
+
+  - case_id: runtime-instability-observed
+    description: Recent runtime instability is accurately summarized.
+    expected_status: PASS
+    rationale: The supplied events explicitly show readiness failures and restarts in the recent runtime window.
+    context:
+      task: Summarize recent runtime events.
+      decision: pause
+      explanation: Recent runtime events show readiness failures and repeated restarts.
+      evidence:
+        - interaction_index: 2
+          evidence_id: runtime_events
+          source_tool: get_recent_events
+          status: OBSERVED
+          content: '[{"severity":"warning","message":"candidate readiness probe failed","occurred_seconds_ago":30},{"severity":"warning","message":"candidate pod restarted","occurred_seconds_ago":20}]'
+
+  - case_id: runtime-events-unobserved
+    description: Repeated pod restarts are claimed without runtime-event evidence.
+    expected_status: FAIL
+    rationale: No runtime event observation is included, so the restart claim lacks support in the bounded context.
+    context:
+      task: Assess the rollout.
+      decision: rollback
+      explanation: Candidate pods restarted repeatedly.
+      evidence:
+        - interaction_index: 0
+          evidence_id: rollout_state
+          source_tool: get_rollout_state
+          status: OBSERVED
+          content: '{"phase":"Progressing","candidate_weight":20}'
+
+  - case_id: evidence-evolved-to-healthy
+    description: Explanation represents an unavailable observation followed by healthy metrics.
+    expected_status: PASS
+    rationale: The ordered evidence shows the initial unavailable result and a later successful payload with healthy metrics.
+    context:
+      task: Reassess metrics after telemetry recovers.
+      decision: promote
+      explanation: Metrics were initially unavailable but later became available and showed healthy behavior.
+      evidence:
+        - interaction_index: 0
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: UNAVAILABLE
+          content: '{"available":false,"metrics":null,"message":"temporary telemetry outage"}'
+        - interaction_index: 3
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: OBSERVED
+          content: >-
+            {"available":true,"metrics":{"stable_error_rate":0.002,"candidate_error_rate":0.002,"stable_p95_ms":210,"candidate_p95_ms":212,"candidate_requests":400},"message":null}
+
+  - case_id: evidence-evolution-misrepresented
+    description: Explanation says metrics stayed unavailable despite a later observation.
+    expected_status: FAIL
+    rationale: The second ordered observation is successful and contains metrics, contradicting the claim that they remained unavailable throughout.
+    context:
+      task: Summarize metric availability during the run.
+      decision: pause
+      explanation: Metrics remained unavailable throughout the run.
+      evidence:
+        - interaction_index: 0
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: UNAVAILABLE
+          content: '{"available":false,"metrics":null,"message":"temporary telemetry outage"}'
+        - interaction_index: 3
+          evidence_id: service_metrics
+          source_tool: get_service_metrics
+          status: OBSERVED
+          content: >-
+            {"available":true,"metrics":{"stable_error_rate":0.002,"candidate_error_rate":0.002,"stable_p95_ms":210,"candidate_p95_ms":212,"candidate_requests":400},"message":null}
+
+  - case_id: ambiguous-meaningful-instability
+    description: Evidence supports an interpretive instability claim only ambiguously.
+    expected_status: INCONCLUSIVE
+    rationale: The event says readiness changed intermittently, but the bounded evidence does not define whether that qualifies as meaningful instability.
+    context:
+      task: Assess the significance of recent runtime events.
+      decision: pause
+      explanation: The rollout showed meaningful instability.
+      evidence:
+        - interaction_index: 2
+          evidence_id: runtime_events
+          source_tool: get_recent_events
+          status: OBSERVED
+          content: '[{"severity":"info","message":"candidate experienced intermittent readiness changes","occurred_seconds_ago":45}]'

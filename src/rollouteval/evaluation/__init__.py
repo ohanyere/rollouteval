@@ -2,6 +2,14 @@
 
 from rollouteval.evaluation.decision import DecisionGrader
 from rollouteval.evaluation.abstention import AbstentionGrader
+from rollouteval.evaluation.calibration import (
+    GroundednessCalibrationCase,
+    GroundednessCalibrationReport,
+    GroundednessCalibrationResult,
+    GroundednessCalibrationRunner,
+    GroundednessCalibrationSet,
+    load_groundedness_calibration,
+)
 from rollouteval.evaluation.evidence import (
     EvidenceExtractionError,
     EvidenceId,
@@ -44,6 +52,11 @@ __all__ = [
     "EvidenceStatus",
     "EvidenceSufficiencyGrader",
     "FinalStateGrader",
+    "GroundednessCalibrationCase",
+    "GroundednessCalibrationReport",
+    "GroundednessCalibrationResult",
+    "GroundednessCalibrationRunner",
+    "GroundednessCalibrationSet",
     "GroundingContext",
     "GroundingEvidenceItem",
     "GroundednessGrader",
@@ -57,4 +70,5 @@ __all__ = [
     "TrajectoryGrader",
     "extract_evidence",
     "build_grounding_context",
+    "load_groundedness_calibration",
 ]
