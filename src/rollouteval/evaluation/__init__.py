@@ -11,6 +11,7 @@ from rollouteval.evaluation.evidence import (
 )
 from rollouteval.evaluation.final_state import FinalStateGrader
 from rollouteval.evaluation.results import GraderResult, GraderStatus
+from rollouteval.evaluation.safety import SafetyGrader
 from rollouteval.evaluation.trajectory import TrajectoryGrader
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "FinalStateGrader",
     "GraderResult",
     "GraderStatus",
+    "SafetyGrader",
     "TrajectoryGrader",
     "extract_evidence",
 ]
