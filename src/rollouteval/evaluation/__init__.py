@@ -25,6 +25,10 @@ from rollouteval.evaluation.groundedness import (
     GroundednessJudge,
     GroundednessJudgment,
 )
+from rollouteval.evaluation.providers import (
+    GroundednessJudgeResponseError,
+    OpenAIGroundednessJudge,
+)
 from rollouteval.evaluation.results import GraderResult, GraderStatus
 from rollouteval.evaluation.safety import SafetyGrader
 from rollouteval.evaluation.trajectory import TrajectoryGrader
@@ -45,8 +49,10 @@ __all__ = [
     "GroundednessGrader",
     "GroundednessJudge",
     "GroundednessJudgment",
+    "GroundednessJudgeResponseError",
     "GraderResult",
     "GraderStatus",
+    "OpenAIGroundednessJudge",
     "SafetyGrader",
     "TrajectoryGrader",
     "extract_evidence",
