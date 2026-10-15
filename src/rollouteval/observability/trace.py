@@ -38,6 +38,7 @@ class TraceEvent(BaseModel):
     step: int | None = Field(default=None, ge=1)
     tool_name: AgentToolName | None = None
     message: str | None = Field(default=None, min_length=1)
+    duration_ms: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def validate_tool_event_fields(self) -> "TraceEvent":
@@ -46,6 +47,16 @@ class TraceEvent(BaseModel):
             raise ValueError("tool events require tool_name")
         if not is_tool_event and self.tool_name is not None:
             raise ValueError("non-tool events must not include tool_name")
+        duration_event_types = {
+            TraceEventType.MODEL_COMPLETED,
+            TraceEventType.MODEL_FAILED,
+            TraceEventType.TOOL_COMPLETED,
+            TraceEventType.TOOL_FAILED,
+            TraceEventType.RUN_COMPLETED,
+            TraceEventType.RUN_FAILED,
+        }
+        if self.duration_ms is not None and self.event_type not in duration_event_types:
+            raise ValueError("duration_ms is only valid on completed or failed events")
         return self
 
 
@@ -75,6 +86,7 @@ class TraceRecorder:
         step: int | None = None,
         tool_name: AgentToolName | None = None,
         message: str | None = None,
+        duration_ms: float | None = None,
     ) -> TraceEvent:
         """Validate and store one event with the next recorder-owned sequence."""
         event = TraceEvent(
@@ -83,6 +95,7 @@ class TraceRecorder:
             step=step,
             tool_name=tool_name,
             message=message,
+            duration_ms=duration_ms,
         )
         self._events.append(event)
         return event

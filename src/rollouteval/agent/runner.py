@@ -1,7 +1,8 @@
 """Synchronous, bounded execution of model-requested rollout tools."""
 
 from json import dumps
-from typing import Protocol
+from time import perf_counter
+from typing import Callable, Protocol
 
 from pydantic import BaseModel
 
@@ -88,12 +89,14 @@ class AgentRunner:
         observation_tools: RolloutObservationTools,
         mutation_tools: RolloutMutationTools,
         max_steps: int = 8,
+        clock: Callable[[], float] = perf_counter,
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
         self._model = model
         self._dispatcher = RolloutToolDispatcher(observation_tools, mutation_tools)
         self._max_steps = max_steps
+        self._clock = clock
 
     def run(
         self,
@@ -103,32 +106,47 @@ class AgentRunner:
     ) -> AgentRunResult:
         """Run until a final answer or until the model-output step limit."""
         interactions: tuple[AgentToolInteraction, ...] = ()
+        run_start = self._clock() if trace_recorder is not None else None
         if trace_recorder is not None:
             trace_recorder.record(TraceEventType.RUN_STARTED)
 
         for step in range(1, self._max_steps + 1):
             if trace_recorder is not None:
                 trace_recorder.record(TraceEventType.MODEL_STARTED, step=step)
+                model_start = self._clock()
             try:
                 output: AgentOutput = self._model.respond(task, interactions)
             except Exception as exc:
                 if trace_recorder is not None:
+                    model_end = self._clock()
                     trace_recorder.record(
                         TraceEventType.MODEL_FAILED,
                         step=step,
                         message=f"Model failed: {type(exc).__name__}",
+                        duration_ms=(model_end - model_start) * 1000,
                     )
+                    run_end = self._clock()
                     trace_recorder.record(
                         TraceEventType.RUN_FAILED,
                         message=f"Run failed: {type(exc).__name__}",
+                        duration_ms=(run_end - run_start) * 1000,
                     )
                 raise
 
             if trace_recorder is not None:
-                trace_recorder.record(TraceEventType.MODEL_COMPLETED, step=step)
+                model_end = self._clock()
+                trace_recorder.record(
+                    TraceEventType.MODEL_COMPLETED,
+                    step=step,
+                    duration_ms=(model_end - model_start) * 1000,
+                )
             if isinstance(output, AgentFinalAnswer):
                 if trace_recorder is not None:
-                    trace_recorder.record(TraceEventType.RUN_COMPLETED)
+                    run_end = self._clock()
+                    trace_recorder.record(
+                        TraceEventType.RUN_COMPLETED,
+                        duration_ms=(run_end - run_start) * 1000,
+                    )
                 return AgentRunResult(
                     final_answer=output,
                     interactions=interactions,
@@ -141,28 +159,35 @@ class AgentRunner:
                     step=step,
                     tool_name=output.tool,
                 )
+                tool_start = self._clock()
             try:
                 interaction = self._dispatcher.execute(output)
             except Exception as exc:
                 if trace_recorder is not None:
+                    tool_end = self._clock()
                     trace_recorder.record(
                         TraceEventType.TOOL_FAILED,
                         step=step,
                         tool_name=output.tool,
                         message=f"Tool failed: {type(exc).__name__}",
+                        duration_ms=(tool_end - tool_start) * 1000,
                     )
+                    run_end = self._clock()
                     trace_recorder.record(
                         TraceEventType.RUN_FAILED,
                         message=f"Run failed: {type(exc).__name__}",
+                        duration_ms=(run_end - run_start) * 1000,
                     )
                 raise
 
             if trace_recorder is not None:
+                tool_end = self._clock()
                 if interaction.error is None:
                     trace_recorder.record(
                         TraceEventType.TOOL_COMPLETED,
                         step=step,
                         tool_name=output.tool,
+                        duration_ms=(tool_end - tool_start) * 1000,
                     )
                 else:
                     trace_recorder.record(
@@ -170,13 +195,16 @@ class AgentRunner:
                         step=step,
                         tool_name=output.tool,
                         message="mutation limit exceeded",
+                        duration_ms=(tool_end - tool_start) * 1000,
                     )
             interactions = (*interactions, interaction)
 
         if trace_recorder is not None:
+            run_end = self._clock()
             trace_recorder.record(
                 TraceEventType.RUN_FAILED,
                 message="Agent step limit exceeded",
+                duration_ms=(run_end - run_start) * 1000,
             )
         raise AgentStepLimitExceeded(
             f"no final answer produced within {self._max_steps} model steps"
