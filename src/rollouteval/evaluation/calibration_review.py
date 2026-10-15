@@ -12,9 +12,12 @@ from pydantic import field_validator, model_validator
 
 from rollouteval.evaluation.calibration import (
     GroundednessCalibrationCase,
+    GroundednessCalibrationReport,
+    GroundednessCalibrationResult,
     GroundednessCalibrationSet,
     load_groundedness_calibration,
 )
+from rollouteval.evaluation.groundedness import GroundednessJudge
 from rollouteval.evaluation.results import GraderStatus
 
 
@@ -83,10 +86,13 @@ class HumanReviewedGroundednessReferenceSet(BaseModel):
         if len(case_ids) != len(set(case_ids)):
             raise ValueError("review case_id values must be unique")
         for review in self.reviews:
-            if review.decision is not GroundednessReviewDecision.APPROVE:
-                raise ValueError("human-reviewed reference set accepts only APPROVE reviews")
+            if review.decision not in (
+                GroundednessReviewDecision.APPROVE,
+                GroundednessReviewDecision.CHANGE,
+            ):
+                raise ValueError("reference set accepts only APPROVE or CHANGE reviews")
             if review.reviewed_status is None:
-                raise ValueError("APPROVE review must include reviewed_status")
+                raise ValueError("reference review must include reviewed_status")
         return self
 
     def reviewed_status_for(self, case_id: str) -> GraderStatus:
@@ -124,6 +130,8 @@ def load_human_groundedness_reviews(
         candidate = cases.get(review.case_id)
         if candidate is None:
             raise ValueError(f"unknown review case_id: {review.case_id}")
+        if review.decision is not GroundednessReviewDecision.APPROVE:
+            raise ValueError("persisted human-reviewed reference requires APPROVE for every case")
         review.validate_against(candidate)
         reviews_by_id[review.case_id] = review
 
@@ -145,6 +153,43 @@ def load_human_reviewed_groundedness_reference(
         calibration_id=calibration_set.calibration_id,
         reviews=tuple(reviews_by_id[case.case_id] for case in calibration_set.cases),
     )
+
+
+class HumanReviewedGroundednessCalibrationRunner:
+    """Compare judge labels to approved human-reviewed reference statuses."""
+
+    def __init__(self, judge: GroundednessJudge) -> None:
+        self._judge = judge
+
+    def run(
+        self,
+        calibration_set: GroundednessCalibrationSet,
+        reference_set: HumanReviewedGroundednessReferenceSet,
+    ) -> GroundednessCalibrationReport:
+        """Judge contexts in candidate order against reviewed labels only."""
+        if calibration_set.calibration_id != reference_set.calibration_id:
+            raise ValueError("calibration and human-reviewed reference IDs do not match")
+        case_ids = tuple(case.case_id for case in calibration_set.cases)
+        review_ids = tuple(review.case_id for review in reference_set.reviews)
+        if len(case_ids) != len(review_ids) or set(case_ids) != set(review_ids):
+            raise ValueError("human-reviewed reference must contain exactly one entry per case")
+
+        results: list[GroundednessCalibrationResult] = []
+        for case in calibration_set.cases:
+            reference_status = reference_set.reviewed_status_for(case.case_id)
+            judgment = self._judge.judge(case.context)
+            results.append(
+                GroundednessCalibrationResult(
+                    case_id=case.case_id,
+                    expected_status=reference_status,
+                    actual_status=judgment.status,
+                    judge_reason=judgment.reason,
+                )
+            )
+        return GroundednessCalibrationReport(
+            calibration_id=calibration_set.calibration_id,
+            results=tuple(results),
+        )
 
 
 def render_groundedness_review(calibration_set: GroundednessCalibrationSet) -> str:

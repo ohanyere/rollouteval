@@ -78,6 +78,22 @@ class GroundednessCalibrationResult(BaseModel):
         return self.expected_status is self.actual_status
 
 
+class GroundednessStatusAgreement(BaseModel):
+    """Exact label counts for one reference status."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: GraderStatus
+    total: int = Field(ge=0)
+    matched: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_matched_bound(self) -> "GroundednessStatusAgreement":
+        if self.matched > self.total:
+            raise ValueError("matched cannot exceed total")
+        return self
+
+
 class GroundednessCalibrationReport(BaseModel):
     """Ordered exact-label agreement results without a quality threshold."""
 
@@ -109,6 +125,26 @@ class GroundednessCalibrationReport(BaseModel):
     def exact_match_rate(self) -> float:
         """Fraction of cases whose status exactly matched the expected status."""
         return self.matched_cases / self.total_cases
+
+    @property
+    def mismatches(self) -> tuple[GroundednessCalibrationResult, ...]:
+        """Return mismatched cases in calibration order."""
+        return tuple(result for result in self.results if not result.matched)
+
+    @property
+    def status_agreement(self) -> tuple[GroundednessStatusAgreement, ...]:
+        """Return total and matched counts grouped by reference status."""
+        return tuple(
+            GroundednessStatusAgreement(
+                status=status,
+                total=sum(result.expected_status is status for result in self.results),
+                matched=sum(
+                    result.expected_status is status and result.matched
+                    for result in self.results
+                ),
+            )
+            for status in GraderStatus
+        )
 
 
 def load_groundedness_calibration(path: Path) -> GroundednessCalibrationSet:

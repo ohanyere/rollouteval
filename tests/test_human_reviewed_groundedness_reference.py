@@ -104,7 +104,7 @@ def test_reference_set_is_immutable_ordered_and_supports_status_lookup() -> None
 
 def test_reference_set_rejects_non_approved_duplicate_and_empty_reviews() -> None:
     reference = load_human_reviewed_groundedness_reference(CALIBRATION_PATH, REVIEWS_PATH)
-    with pytest.raises(ValidationError, match="only APPROVE"):
+    with pytest.raises(ValidationError, match="APPROVE or CHANGE"):
         HumanReviewedGroundednessReferenceSet(
             calibration_id=reference.calibration_id,
             reviews=(reference.reviews[0].model_copy(update={"decision": GroundednessReviewDecision.FLAG}),),
