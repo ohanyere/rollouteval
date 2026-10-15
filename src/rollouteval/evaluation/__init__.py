@@ -15,6 +15,11 @@ from rollouteval.evaluation.engine import (
     DeterministicEvaluationEngine,
 )
 from rollouteval.evaluation.final_state import FinalStateGrader
+from rollouteval.evaluation.grounding import (
+    GroundingContext,
+    GroundingEvidenceItem,
+    build_grounding_context,
+)
 from rollouteval.evaluation.results import GraderResult, GraderStatus
 from rollouteval.evaluation.safety import SafetyGrader
 from rollouteval.evaluation.trajectory import TrajectoryGrader
@@ -30,9 +35,12 @@ __all__ = [
     "EvidenceStatus",
     "EvidenceSufficiencyGrader",
     "FinalStateGrader",
+    "GroundingContext",
+    "GroundingEvidenceItem",
     "GraderResult",
     "GraderStatus",
     "SafetyGrader",
     "TrajectoryGrader",
     "extract_evidence",
+    "build_grounding_context",
 ]
