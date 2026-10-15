@@ -15,6 +15,7 @@ from rollouteval.agent.contracts import (
     AgentToolName,
 )
 from rollouteval.environment import MutationLimitExceeded
+from rollouteval.observability import TraceEventType, TraceRecorder
 from rollouteval.tools import RolloutMutationTools, RolloutObservationTools
 
 
@@ -94,22 +95,89 @@ class AgentRunner:
         self._dispatcher = RolloutToolDispatcher(observation_tools, mutation_tools)
         self._max_steps = max_steps
 
-    def run(self, task: AgentTask) -> AgentRunResult:
+    def run(
+        self,
+        task: AgentTask,
+        *,
+        trace_recorder: TraceRecorder | None = None,
+    ) -> AgentRunResult:
         """Run until a final answer or until the model-output step limit."""
         interactions: tuple[AgentToolInteraction, ...] = ()
+        if trace_recorder is not None:
+            trace_recorder.record(TraceEventType.RUN_STARTED)
 
         for step in range(1, self._max_steps + 1):
-            output: AgentOutput = self._model.respond(task, interactions)
+            if trace_recorder is not None:
+                trace_recorder.record(TraceEventType.MODEL_STARTED, step=step)
+            try:
+                output: AgentOutput = self._model.respond(task, interactions)
+            except Exception as exc:
+                if trace_recorder is not None:
+                    trace_recorder.record(
+                        TraceEventType.MODEL_FAILED,
+                        step=step,
+                        message=f"Model failed: {type(exc).__name__}",
+                    )
+                    trace_recorder.record(
+                        TraceEventType.RUN_FAILED,
+                        message=f"Run failed: {type(exc).__name__}",
+                    )
+                raise
+
+            if trace_recorder is not None:
+                trace_recorder.record(TraceEventType.MODEL_COMPLETED, step=step)
             if isinstance(output, AgentFinalAnswer):
+                if trace_recorder is not None:
+                    trace_recorder.record(TraceEventType.RUN_COMPLETED)
                 return AgentRunResult(
                     final_answer=output,
                     interactions=interactions,
                     steps=step,
                 )
 
-            interaction = self._dispatcher.execute(output)
+            if trace_recorder is not None:
+                trace_recorder.record(
+                    TraceEventType.TOOL_STARTED,
+                    step=step,
+                    tool_name=output.tool,
+                )
+            try:
+                interaction = self._dispatcher.execute(output)
+            except Exception as exc:
+                if trace_recorder is not None:
+                    trace_recorder.record(
+                        TraceEventType.TOOL_FAILED,
+                        step=step,
+                        tool_name=output.tool,
+                        message=f"Tool failed: {type(exc).__name__}",
+                    )
+                    trace_recorder.record(
+                        TraceEventType.RUN_FAILED,
+                        message=f"Run failed: {type(exc).__name__}",
+                    )
+                raise
+
+            if trace_recorder is not None:
+                if interaction.error is None:
+                    trace_recorder.record(
+                        TraceEventType.TOOL_COMPLETED,
+                        step=step,
+                        tool_name=output.tool,
+                    )
+                else:
+                    trace_recorder.record(
+                        TraceEventType.TOOL_FAILED,
+                        step=step,
+                        tool_name=output.tool,
+                        message="mutation limit exceeded",
+                    )
             interactions = (*interactions, interaction)
 
+        if trace_recorder is not None:
+            trace_recorder.record(
+                TraceEventType.RUN_FAILED,
+                message="Agent step limit exceeded",
+            )
         raise AgentStepLimitExceeded(
             f"no final answer produced within {self._max_steps} model steps"
         )
