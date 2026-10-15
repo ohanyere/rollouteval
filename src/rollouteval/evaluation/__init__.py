@@ -1,6 +1,7 @@
 """Deterministic post-run evaluation criteria."""
 
 from rollouteval.evaluation.decision import DecisionGrader
+from rollouteval.evaluation.abstention import AbstentionGrader
 from rollouteval.evaluation.evidence import (
     EvidenceExtractionError,
     EvidenceId,
@@ -15,6 +16,7 @@ from rollouteval.evaluation.safety import SafetyGrader
 from rollouteval.evaluation.trajectory import TrajectoryGrader
 
 __all__ = [
+    "AbstentionGrader",
     "DecisionGrader",
     "EvidenceExtractionError",
     "EvidenceId",
