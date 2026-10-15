@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from rollouteval.agent.contracts import AgentToolName
+from rollouteval.agent.contracts import AgentToolName, ModelUsage
 
 
 class TraceEventType(StrEnum):
@@ -39,6 +39,8 @@ class TraceEvent(BaseModel):
     tool_name: AgentToolName | None = None
     message: str | None = Field(default=None, min_length=1)
     duration_ms: float | None = Field(default=None, ge=0)
+    model: str | None = Field(default=None, min_length=1)
+    model_usage: ModelUsage | None = None
 
     @model_validator(mode="after")
     def validate_tool_event_fields(self) -> "TraceEvent":
@@ -57,6 +59,9 @@ class TraceEvent(BaseModel):
         }
         if self.duration_ms is not None and self.event_type not in duration_event_types:
             raise ValueError("duration_ms is only valid on completed or failed events")
+        has_model_metadata = self.model is not None or self.model_usage is not None
+        if has_model_metadata and self.event_type is not TraceEventType.MODEL_COMPLETED:
+            raise ValueError("model metadata is only valid on MODEL_COMPLETED")
         return self
 
 
@@ -87,6 +92,8 @@ class TraceRecorder:
         tool_name: AgentToolName | None = None,
         message: str | None = None,
         duration_ms: float | None = None,
+        model: str | None = None,
+        model_usage: ModelUsage | None = None,
     ) -> TraceEvent:
         """Validate and store one event with the next recorder-owned sequence."""
         event = TraceEvent(
@@ -96,6 +103,8 @@ class TraceRecorder:
             tool_name=tool_name,
             message=message,
             duration_ms=duration_ms,
+            model=model,
+            model_usage=model_usage,
         )
         self._events.append(event)
         return event

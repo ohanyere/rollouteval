@@ -6,6 +6,7 @@ import pytest
 
 from rollouteval.agent import (
     AgentFinalAnswer,
+    AgentModelResponse,
     AgentRunner,
     AgentTask,
     AgentToolCall,
@@ -24,7 +25,7 @@ SCENARIO_TOOL_NAMES = tuple(AgentToolName)
 
 
 class FakeResponses:
-    def __init__(self, outputs: list[str | Exception]) -> None:
+    def __init__(self, outputs: list[str | Exception | SimpleNamespace]) -> None:
         self.outputs = iter(outputs)
         self.calls: list[dict[str, object]] = []
 
@@ -33,6 +34,8 @@ class FakeResponses:
         output = next(self.outputs)
         if isinstance(output, Exception):
             raise output
+        if isinstance(output, SimpleNamespace):
+            return output
         return SimpleNamespace(output_text=output)
 
 
@@ -177,8 +180,9 @@ def test_provider_parses_each_allowed_tool_call(tool: AgentToolName) -> None:
 
     output = provider.respond(AgentTask(task="Assess rollout."), ())
 
-    assert isinstance(output, AgentToolCall)
-    assert output.tool is tool
+    assert isinstance(output, AgentModelResponse)
+    assert isinstance(output.output, AgentToolCall)
+    assert output.output.tool is tool
 
 
 def test_provider_parses_valid_final_answer() -> None:
@@ -186,8 +190,9 @@ def test_provider_parses_valid_final_answer() -> None:
 
     output = provider.respond(AgentTask(task="Assess rollout."), ())
 
-    assert isinstance(output, AgentFinalAnswer)
-    assert output.decision is Decision.PAUSE
+    assert isinstance(output, AgentModelResponse)
+    assert isinstance(output.output, AgentFinalAnswer)
+    assert output.output.decision is Decision.PAUSE
 
 
 @pytest.mark.parametrize("decision", list(Decision))
@@ -196,8 +201,9 @@ def test_provider_parses_each_final_decision(decision: Decision) -> None:
 
     output = provider.respond(AgentTask(task="Assess rollout."), ())
 
-    assert isinstance(output, AgentFinalAnswer)
-    assert output.decision is decision
+    assert isinstance(output, AgentModelResponse)
+    assert isinstance(output.output, AgentFinalAnswer)
+    assert output.output.decision is decision
 
 
 def test_empty_response_raises_provider_response_error() -> None:
@@ -280,9 +286,9 @@ def test_later_provider_call_includes_previous_interaction() -> None:
     provider, client = _provider([_tool_json(AgentToolName.GET_ROLLOUT_STATE), _final_json()])
     task = AgentTask(task="Assess rollout.")
     output = provider.respond(task, ())
-    assert isinstance(output, AgentToolCall)
+    assert isinstance(output.output, AgentToolCall)
     history = (
-        AgentToolInteraction.successful(output, '{"phase":"Progressing"}'),
+        AgentToolInteraction.successful(output.output, '{"phase":"Progressing"}'),
     )
 
     provider.respond(task, history)
@@ -311,7 +317,9 @@ def test_openai_responses_model_satisfies_agent_model_protocol_shape() -> None:
     provider, _ = _provider([_final_json()])
 
     assert callable(provider.respond)
-    assert isinstance(provider.respond(AgentTask(task="Assess rollout."), ()), AgentFinalAnswer)
+    response = provider.respond(AgentTask(task="Assess rollout."), ())
+    assert isinstance(response, AgentModelResponse)
+    assert isinstance(response.output, AgentFinalAnswer)
 
 
 def test_provider_works_through_runner_with_fake_client_offline() -> None:

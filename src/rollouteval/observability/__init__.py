@@ -6,5 +6,6 @@ from rollouteval.observability.trace import (
     TraceEventType,
     TraceRecorder,
 )
+from rollouteval.agent.contracts import ModelUsage
 
-__all__ = ["RunTrace", "TraceEvent", "TraceEventType", "TraceRecorder"]
+__all__ = ["ModelUsage", "RunTrace", "TraceEvent", "TraceEventType", "TraceRecorder"]

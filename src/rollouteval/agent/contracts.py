@@ -59,6 +59,29 @@ class AgentFinalAnswer(BaseModel):
 AgentOutput = Annotated[AgentToolCall | AgentFinalAnswer, Field(discriminator="kind")]
 
 
+class ModelUsage(BaseModel):
+    """Provider-reported token counts for one model invocation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    total_tokens: int = Field(ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    cache_write_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
+
+
+class AgentModelResponse(BaseModel):
+    """Semantic model output with optional operational invocation metadata."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+    output: AgentOutput
+    model: str | None = Field(default=None, min_length=1)
+    usage: ModelUsage | None = None
+
+
 class AgentToolInteraction(BaseModel):
     """One completed call and its JSON-encoded safe result or expected error."""
 

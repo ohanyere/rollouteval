@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from rollouteval.agent.contracts import (
     AgentFinalAnswer,
-    AgentOutput,
+    AgentModelResponse,
     AgentRunResult,
     AgentTask,
     AgentToolCall,
@@ -27,7 +27,7 @@ class AgentModel(Protocol):
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         """Return the next tool call or final answer."""
         ...
 
@@ -115,7 +115,7 @@ class AgentRunner:
                 trace_recorder.record(TraceEventType.MODEL_STARTED, step=step)
                 model_start = self._clock()
             try:
-                output: AgentOutput = self._model.respond(task, interactions)
+                model_response = self._model.respond(task, interactions)
             except Exception as exc:
                 if trace_recorder is not None:
                     model_end = self._clock()
@@ -139,7 +139,10 @@ class AgentRunner:
                     TraceEventType.MODEL_COMPLETED,
                     step=step,
                     duration_ms=(model_end - model_start) * 1000,
+                    model=model_response.model,
+                    model_usage=model_response.usage,
                 )
+            output = model_response.output
             if isinstance(output, AgentFinalAnswer):
                 if trace_recorder is not None:
                     run_end = self._clock()

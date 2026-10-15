@@ -6,6 +6,7 @@ import pytest
 from rollouteval.agent import (
     AgentFinalAnswer,
     AgentModel,
+    AgentModelResponse,
     AgentOutput,
     AgentRunner,
     AgentStepLimitExceeded,
@@ -69,10 +70,10 @@ class ScriptedModel:
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         assert isinstance(task, AgentTask)
         self.interaction_histories.append(interactions)
-        return next(self._outputs)
+        return AgentModelResponse(output=next(self._outputs))
 
 
 class FailingModel:
@@ -84,7 +85,7 @@ class FailingModel:
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         self.calls += 1
         raise self.error
 

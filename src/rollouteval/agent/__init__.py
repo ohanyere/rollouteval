@@ -2,12 +2,14 @@
 
 from rollouteval.agent.contracts import (
     AgentFinalAnswer,
+    AgentModelResponse,
     AgentOutput,
     AgentRunResult,
     AgentTask,
     AgentToolCall,
     AgentToolInteraction,
     AgentToolName,
+    ModelUsage,
 )
 from rollouteval.agent.runner import (
     AgentModel,
@@ -18,6 +20,7 @@ from rollouteval.agent.runner import (
 
 __all__ = [
     "AgentFinalAnswer",
+    "AgentModelResponse",
     "AgentOutput",
     "AgentRunResult",
     "AgentModel",
@@ -27,5 +30,6 @@ __all__ = [
     "AgentToolCall",
     "AgentToolInteraction",
     "AgentToolName",
+    "ModelUsage",
     "RolloutToolDispatcher",
 ]

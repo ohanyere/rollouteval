@@ -6,10 +6,12 @@ from typing import Any
 from pydantic import TypeAdapter, ValidationError
 
 from rollouteval.agent.contracts import (
+    AgentModelResponse,
     AgentOutput,
     AgentTask,
     AgentToolInteraction,
     AgentToolName,
+    ModelUsage,
 )
 
 
@@ -51,7 +53,7 @@ class OpenAIResponsesModel:
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         """Request and validate one model output, rebuilding context from history."""
         request_data = {
             "task": task.task,
@@ -82,8 +84,32 @@ class OpenAIResponsesModel:
             raise AgentProviderResponseError("OpenAI response was not valid JSON") from exc
 
         try:
-            return _OUTPUT_ADAPTER.validate_python(parsed)
+            output = _OUTPUT_ADAPTER.validate_python(parsed)
         except ValidationError as exc:
             raise AgentProviderResponseError(
                 "OpenAI response did not match the AgentOutput contract"
             ) from exc
+        usage = _extract_usage(getattr(response, "usage", None))
+        returned_model = getattr(response, "model", None)
+        model = (
+            returned_model
+            if isinstance(returned_model, str) and returned_model.strip()
+            else self.model
+        )
+        return AgentModelResponse(output=output, model=model, usage=usage)
+
+
+def _extract_usage(usage: Any | None) -> ModelUsage | None:
+    """Translate Responses API token metadata into provider-neutral counts."""
+    if usage is None:
+        return None
+    input_details = getattr(usage, "input_tokens_details", None)
+    output_details = getattr(usage, "output_tokens_details", None)
+    return ModelUsage(
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        total_tokens=usage.total_tokens,
+        cached_input_tokens=getattr(input_details, "cached_tokens", None),
+        cache_write_tokens=getattr(input_details, "cache_write_tokens", None),
+        reasoning_tokens=getattr(output_details, "reasoning_tokens", None),
+    )

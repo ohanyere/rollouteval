@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from rollouteval.agent import (
     AgentFinalAnswer,
     AgentModel,
+    AgentModelResponse,
     AgentOutput,
     AgentRunner,
     AgentStepLimitExceeded,
@@ -57,10 +58,10 @@ class ScriptedModel:
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         assert isinstance(task, AgentTask)
         self.calls.append((task, interactions))
-        return next(self._outputs)
+        return AgentModelResponse(output=next(self._outputs))
 
 
 def _runner(

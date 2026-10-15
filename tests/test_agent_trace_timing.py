@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from rollouteval.agent import (
     AgentFinalAnswer,
     AgentModel,
+    AgentModelResponse,
     AgentOutput,
     AgentRunner,
     AgentStepLimitExceeded,
@@ -91,9 +92,9 @@ class ScriptedModel:
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         self.histories.append(interactions)
-        return next(self.outputs)
+        return AgentModelResponse(output=next(self.outputs))
 
 
 class FailingModel:
@@ -104,7 +105,7 @@ class FailingModel:
         self,
         task: AgentTask,
         interactions: tuple[AgentToolInteraction, ...],
-    ) -> AgentOutput:
+    ) -> AgentModelResponse:
         raise self.error
 
 
