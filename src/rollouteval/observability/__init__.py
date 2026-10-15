@@ -7,5 +7,25 @@ from rollouteval.observability.trace import (
     TraceRecorder,
 )
 from rollouteval.agent.contracts import ModelUsage
+from rollouteval.observability.cost import (
+    CostEstimationUnavailable,
+    CostEstimator,
+    ModelCallCost,
+    ModelTokenPricing,
+    PricingSnapshot,
+    RunCostEstimate,
+)
 
-__all__ = ["ModelUsage", "RunTrace", "TraceEvent", "TraceEventType", "TraceRecorder"]
+__all__ = [
+    "CostEstimationUnavailable",
+    "CostEstimator",
+    "ModelCallCost",
+    "ModelTokenPricing",
+    "ModelUsage",
+    "PricingSnapshot",
+    "RunCostEstimate",
+    "RunTrace",
+    "TraceEvent",
+    "TraceEventType",
+    "TraceRecorder",
+]
