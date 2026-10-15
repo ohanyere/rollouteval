@@ -20,6 +20,11 @@ from rollouteval.evaluation.grounding import (
     GroundingEvidenceItem,
     build_grounding_context,
 )
+from rollouteval.evaluation.groundedness import (
+    GroundednessGrader,
+    GroundednessJudge,
+    GroundednessJudgment,
+)
 from rollouteval.evaluation.results import GraderResult, GraderStatus
 from rollouteval.evaluation.safety import SafetyGrader
 from rollouteval.evaluation.trajectory import TrajectoryGrader
@@ -37,6 +42,9 @@ __all__ = [
     "FinalStateGrader",
     "GroundingContext",
     "GroundingEvidenceItem",
+    "GroundednessGrader",
+    "GroundednessJudge",
+    "GroundednessJudgment",
     "GraderResult",
     "GraderStatus",
     "SafetyGrader",
