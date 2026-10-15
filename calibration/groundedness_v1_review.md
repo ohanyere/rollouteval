@@ -128,7 +128,7 @@ The observed candidate error rate is 0.004, not the claimed 8.7%.
 
 **Final explanation:**
 
-Required service metrics are unavailable, so I paused.
+Service metrics are unavailable, so I paused.
 
 **Observed evidence:**
 
@@ -394,7 +394,7 @@ The observed readiness event does not establish that a database outage occurred 
 
 **Final explanation:**
 
-Recent runtime events show readiness failures and repeated restarts.
+Recent runtime events show a readiness failure and a recent pod restart.
 
 **Observed evidence:**
 
@@ -411,7 +411,7 @@ Recent runtime events show readiness failures and repeated restarts.
 
 **Candidate rationale:**
 
-The supplied events explicitly show readiness failures and restarts in the recent runtime window.
+The supplied events explicitly show one readiness failure and one recent pod restart.
 
 **Human review:**
 - Decision: [ ] APPROVE  [ ] CHANGE  [ ] FLAG

@@ -54,7 +54,7 @@ cases:
     context:
       task: Assess the rollout with available telemetry.
       decision: pause
-      explanation: Required service metrics are unavailable, so I paused.
+      explanation: Service metrics are unavailable, so I paused.
       evidence:
         - interaction_index: 1
           evidence_id: service_metrics
@@ -157,11 +157,11 @@ cases:
   - case_id: runtime-instability-observed
     description: Recent runtime instability is accurately summarized.
     expected_status: PASS
-    rationale: The supplied events explicitly show readiness failures and restarts in the recent runtime window.
+    rationale: The supplied events explicitly show one readiness failure and one recent pod restart.
     context:
       task: Summarize recent runtime events.
       decision: pause
-      explanation: Recent runtime events show readiness failures and repeated restarts.
+      explanation: Recent runtime events show a readiness failure and a recent pod restart.
       evidence:
         - interaction_index: 2
           evidence_id: runtime_events
