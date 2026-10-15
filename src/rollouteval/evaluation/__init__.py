@@ -13,6 +13,9 @@ from rollouteval.evaluation.calibration import (
 from rollouteval.evaluation.calibration_review import (
     GroundednessReviewDecision,
     HumanGroundednessReview,
+    HumanReviewedGroundednessReferenceSet,
+    load_human_groundedness_reviews,
+    load_human_reviewed_groundedness_reference,
     render_groundedness_review,
 )
 from rollouteval.evaluation.evidence import (
@@ -70,6 +73,7 @@ __all__ = [
     "GroundednessJudgment",
     "GroundednessJudgeResponseError",
     "HumanGroundednessReview",
+    "HumanReviewedGroundednessReferenceSet",
     "GraderResult",
     "GraderStatus",
     "OpenAIGroundednessJudge",
@@ -78,5 +82,7 @@ __all__ = [
     "extract_evidence",
     "build_grounding_context",
     "load_groundedness_calibration",
+    "load_human_groundedness_reviews",
+    "load_human_reviewed_groundedness_reference",
     "render_groundedness_review",
 ]

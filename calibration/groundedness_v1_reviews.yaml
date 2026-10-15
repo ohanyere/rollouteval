@@ -1,0 +1,92 @@
+calibration_id: groundedness-v1-candidates
+reviews:
+  - case_id: observed-metrics-supported
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: exact-metrics-unobserved
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: metric-claim-contradicted
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: unavailable-metrics-acknowledged
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: metrics-invented-when-unavailable
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: observation-error-acknowledged
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: successful-metrics-called-error
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: limited-claim-with-missing-metrics
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: wrong-action-grounded-facts
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: unsupported-database-causality
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: runtime-instability-observed
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: runtime-events-unobserved
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: evidence-evolved-to-healthy
+    decision: APPROVE
+    reviewed_status: PASS
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: evidence-evolution-misrepresented
+    decision: APPROVE
+    reviewed_status: FAIL
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
+  - case_id: ambiguous-meaningful-instability
+    decision: APPROVE
+    reviewed_status: INCONCLUSIVE
+    reviewer: human-reviewer
+    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
+    reviewed_at: "2026-10-15"
