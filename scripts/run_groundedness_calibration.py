@@ -13,15 +13,20 @@ from rollouteval.evaluation.calibration_review import (
     HumanReviewedGroundednessCalibrationRunner,
     load_human_reviewed_groundedness_reference,
 )
-from rollouteval.evaluation.providers.openai import OpenAIGroundednessJudge
+from rollouteval.evaluation.providers import (
+    GroqGroundednessJudge,
+    OpenAIGroundednessJudge,
+)
+from rollouteval.provider_client import configured_api_provider
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--provider", choices=("groq", "openai"), required=True)
     parser.add_argument(
         "--model",
         required=True,
-        help="OpenAI model identifier used for groundedness judging",
+        help="Model identifier used for groundedness judging",
     )
     return parser
 
@@ -58,6 +63,9 @@ def format_groundedness_calibration_report(
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if configured_api_provider(args.provider) is None:
+        key_name = f"{args.provider.upper()}_API_KEY"
+        raise SystemExit(f"{key_name} must be configured")
     project_root = Path(__file__).resolve().parents[1]
     calibration_path = project_root / "calibration" / "groundedness_v1.yaml"
     reviews_path = project_root / "calibration" / "groundedness_v1_reviews.yaml"
@@ -66,7 +74,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         calibration_path,
         reviews_path,
     )
-    judge = OpenAIGroundednessJudge(model=args.model)
+    judge_type = (
+        GroqGroundednessJudge
+        if args.provider == "groq"
+        else OpenAIGroundednessJudge
+    )
+    judge = judge_type(model=args.model)
     report = HumanReviewedGroundednessCalibrationRunner(judge).run(
         calibration_set,
         reference_set,

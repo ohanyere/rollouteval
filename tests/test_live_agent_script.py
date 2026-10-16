@@ -54,7 +54,7 @@ def _fake_client() -> FakeClient:
 
 def test_live_helper_loads_only_degraded_canary() -> None:
     scenario, _, _, _, _ = run_live_agent.build_live_run(
-        "degraded-canary", "test-model", client=_fake_client()
+        "degraded-canary", "test-model", client=_fake_client(), provider="openai"
     )
 
     assert scenario.id == "degraded-canary"
@@ -63,7 +63,7 @@ def test_live_helper_loads_only_degraded_canary() -> None:
 
 def test_live_helper_constructs_safe_agent_task() -> None:
     _, _, task, _, _ = run_live_agent.build_live_run(
-        "degraded-canary", "test-model", client=_fake_client()
+        "degraded-canary", "test-model", client=_fake_client(), provider="openai"
     )
 
     assert isinstance(task, AgentTask)
@@ -90,7 +90,7 @@ def test_live_helper_passes_model_and_existing_tools_to_runner(monkeypatch: pyte
     fake_client = object()
 
     scenario, environment, task, runner, observations = run_live_agent.build_live_run(
-        "degraded-canary", "gpt-6-luna", client=fake_client
+        "degraded-canary", "gpt-6-luna", client=fake_client, provider="openai"
     )
 
     assert scenario.id == "degraded-canary"
@@ -108,7 +108,7 @@ def test_safe_summary_contains_runtime_result_without_private_truth() -> None:
     client = _fake_client()
 
     summary = run_live_agent.execute_live_run(
-        "degraded-canary", "gpt-6-luna", client=client
+        "degraded-canary", "gpt-6-luna", client=client, provider="openai"
     )
 
     assert summary["scenario_id"] == "degraded-canary"
@@ -138,23 +138,64 @@ def test_missing_api_key_stops_before_provider_construction(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
     def fail_if_constructed(*args: object, **kwargs: object) -> None:
         pytest.fail("provider must not be constructed without configured credentials")
 
     monkeypatch.setattr(run_live_agent, "OpenAIResponsesModel", fail_if_constructed)
 
-    exit_code = run_live_agent.main(
-        ["--scenario", "degraded-canary", "--model", "gpt-6-luna"]
-    )
+    exit_code = run_live_agent.main(["--provider", "openai", "--model", "gpt-6-luna"])
 
     assert exit_code == 2
     assert "LIVE RUN BLOCKED: OPENAI_API_KEY is not configured." in capsys.readouterr().err
 
 
+def test_live_cli_accepts_explicit_groq_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
+    parsed = run_live_agent.build_parser().parse_args(
+        ["--provider", "groq", "--model", "test-model"]
+    )
+    assert parsed.provider == "groq"
+    assert parsed.model == "test-model"
+
+
+def test_live_helper_selects_groq_agent_implementation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class FakeGroqModel:
+        def __init__(self, model: str, client: object = None) -> None:
+            captured.update(model=model, client=client)
+
+    monkeypatch.setattr(run_live_agent, "GroqResponsesModel", FakeGroqModel)
+    client = object()
+
+    _, _, _, runner, _ = run_live_agent.build_live_run(
+        "degraded-canary", "caller-model", client=client, provider="groq"
+    )
+
+    assert isinstance(runner, run_live_agent.AgentRunner)
+    assert captured == {"model": "caller-model", "client": client}
+
+
+def test_live_cli_requires_provider_and_model() -> None:
+    parser = run_live_agent.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--provider", "openai"])
+
+
+def test_live_cli_rejects_invalid_provider() -> None:
+    with pytest.raises(SystemExit):
+        run_live_agent.build_parser().parse_args(["--provider", "other", "--model", "m"])
+
+
 def test_fake_live_execution_makes_no_network_calls() -> None:
     client = _fake_client()
 
-    run_live_agent.execute_live_run("degraded-canary", "test-model", client=client)
+    run_live_agent.execute_live_run("degraded-canary", "test-model", client=client, provider="openai")
 
     assert len(client.responses.calls) == 2

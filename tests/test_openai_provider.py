@@ -13,7 +13,11 @@ from rollouteval.agent import (
     AgentToolInteraction,
     AgentToolName,
 )
-from rollouteval.agent.providers import AgentProviderResponseError, OpenAIResponsesModel
+from rollouteval.agent.providers import (
+    AgentProviderResponseError,
+    GroqResponsesModel,
+    OpenAIResponsesModel,
+)
 from rollouteval.domain.scenario import Decision
 from rollouteval.environment import RolloutEnvironment
 from rollouteval.scenarios import load_scenario
@@ -81,6 +85,31 @@ def test_injected_client_does_not_require_openai_api_key(monkeypatch: pytest.Mon
     provider, _ = _provider([_final_json()])
 
     assert isinstance(provider, OpenAIResponsesModel)
+
+
+def test_groq_agent_provider_uses_responses_api_and_parses_semantic_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeClient([_tool_json(AgentToolName.GET_SERVICE_METRICS)])
+    captured = {}
+
+    def fake_openai(**kwargs: object) -> FakeClient:
+        captured.update(kwargs)
+        return client
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    provider = GroqResponsesModel(model="test-model")
+
+    result = provider.respond(AgentTask(task="Assess rollout."), ())
+
+    assert captured == {
+        "api_key": "test-groq-key",
+        "base_url": "https://api.groq.com/openai/v1",
+    }
+    assert result.output.kind == "tool_call"
+    assert result.output.tool is AgentToolName.GET_SERVICE_METRICS
+    assert client.responses.calls[0]["text"] == {"format": {"type": "json_object"}}
 
 
 def test_provider_request_contains_task_text() -> None:

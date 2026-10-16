@@ -267,15 +267,22 @@ def test_answer_key_metadata_never_reaches_judge_or_context_serialization() -> N
         assert all(field not in payload for field in forbidden)
 
 
-def test_cli_parser_requires_model_and_has_no_default() -> None:
+def test_cli_parser_requires_provider_and_model_without_defaults() -> None:
     parser = build_parser()
     model_action = next(action for action in parser._actions if action.dest == "model")
+    provider_action = next(action for action in parser._actions if action.dest == "provider")
 
     assert model_action.required is True
     assert model_action.default is None
+    assert provider_action.required is True
+    assert provider_action.default is None
     with pytest.raises(SystemExit):
         parser.parse_args([])
-    assert parser.parse_args(["--model", "test-model"]).model == "test-model"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--provider", "groq"])
+    assert build_parser().parse_args(["--provider", "groq", "--model", "test-model"]).provider == "groq"
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--provider", "invalid", "--model", "test-model"])
 
 
 def test_cli_references_canonical_files_without_credential_inspection() -> None:
@@ -283,8 +290,49 @@ def test_cli_references_canonical_files_without_credential_inspection() -> None:
 
     assert '"groundedness_v1.yaml"' in source
     assert '"groundedness_v1_reviews.yaml"' in source
-    assert "OPENAI_API_KEY" not in source
+    assert 'choices=("groq", "openai")' in source
     assert "os.environ" not in source
+
+
+@pytest.mark.parametrize(
+    ("provider", "expected_attribute"),
+    [("openai", "OpenAIGroundednessJudge"), ("groq", "GroqGroundednessJudge")],
+)
+def test_cli_selects_explicit_provider_adapter(
+    monkeypatch: pytest.MonkeyPatch, provider: str, expected_attribute: str
+) -> None:
+    monkeypatch.setattr(_CLI_MODULE, "configured_api_provider", lambda selected: selected)
+    captured = {}
+
+    class FakeJudge:
+        def __init__(self, *, model: str):
+            captured["model"] = model
+
+    class FakeRunner:
+        def __init__(self, judge):
+            captured["judge"] = judge
+
+        def run(self, calibration, reference):
+            return GroundednessCalibrationReport(
+                calibration_id="test",
+                results=(
+                    GroundednessCalibrationResult(
+                        case_id="case",
+                        expected_status=GraderStatus.PASS,
+                        actual_status=GraderStatus.PASS,
+                        judge_reason="Supported.",
+                    ),
+                ),
+            )
+
+    monkeypatch.setattr(_CLI_MODULE, expected_attribute, FakeJudge)
+    monkeypatch.setattr(_CLI_MODULE, "HumanReviewedGroundednessCalibrationRunner", FakeRunner)
+    monkeypatch.setattr(_CLI_MODULE, "load_groundedness_calibration", lambda path: object())
+    monkeypatch.setattr(_CLI_MODULE, "load_human_reviewed_groundedness_reference", lambda *paths: object())
+
+    assert _CLI_MODULE.main(["--provider", provider, "--model", "chosen-model"]) == 0
+    assert captured["model"] == "chosen-model"
+    assert isinstance(captured["judge"], FakeJudge)
 
 
 def test_cli_formatter_contains_summary_and_case_diagnostics() -> None:

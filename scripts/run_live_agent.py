@@ -2,23 +2,22 @@
 
 import argparse
 import json
-import os
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
 from rollouteval.agent import AgentRunner, AgentRunResult, AgentTask
-from rollouteval.agent.providers import OpenAIResponsesModel
+from rollouteval.agent.providers import GroqResponsesModel, OpenAIResponsesModel
 from rollouteval.domain.scenario import Scenario
 from rollouteval.environment import RolloutEnvironment
 from rollouteval.scenarios import load_scenario
 from rollouteval.tools import RolloutMutationTools, RolloutObservationTools
+from rollouteval.provider_client import configured_api_provider
 
 
 SCENARIO_DIR = Path(__file__).resolve().parents[1] / "scenarios"
 SUPPORTED_SCENARIO = "degraded-canary"
-DEFAULT_MODEL = "gpt-6-luna"
 
 
 def build_live_run(
@@ -26,6 +25,7 @@ def build_live_run(
     model_id: str,
     *,
     client: Any | None = None,
+    provider: str,
 ) -> tuple[Scenario, RolloutEnvironment, AgentTask, AgentRunner, RolloutObservationTools]:
     """Construct the existing environment and runner for degraded-canary only."""
     if scenario_id != SUPPORTED_SCENARIO:
@@ -36,7 +36,8 @@ def build_live_run(
     observation_tools = RolloutObservationTools(environment)
     mutation_tools = RolloutMutationTools(environment)
     task = AgentTask.from_scenario(scenario)
-    model = OpenAIResponsesModel(model=model_id, client=client)
+    model_type = GroqResponsesModel if provider == "groq" else OpenAIResponsesModel
+    model = model_type(model=model_id, client=client)
     runner = AgentRunner(model, observation_tools, mutation_tools)
     return scenario, environment, task, runner, observation_tools
 
@@ -87,10 +88,11 @@ def execute_live_run(
     model_id: str,
     *,
     client: Any | None = None,
+    provider: str,
 ) -> dict[str, object]:
     """Execute one runner episode and return its safe inspectable summary."""
     _, environment, task, runner, observation_tools = build_live_run(
-        scenario_id, model_id, client=client
+        scenario_id, model_id, client=client, provider=provider
     )
     result = runner.run(task)
     return safe_run_summary(
@@ -100,23 +102,33 @@ def execute_live_run(
 
 def _safe_error_message(error: Exception) -> str:
     """Avoid printing recognizable API key strings from provider errors."""
-    return re.sub(r"\bsk-[A-Za-z0-9_-]{12,}\b", "[REDACTED]", str(error))
+    return re.sub(r"\b(?:sk-|gsk_)[A-Za-z0-9_-]{12,}\b", "[REDACTED]", str(error))
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--scenario", choices=(SUPPORTED_SCENARIO,), default=SUPPORTED_SCENARIO
     )
-    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--provider", choices=("groq", "openai"), required=True)
+    parser.add_argument("--model", required=True)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
-    if not os.environ.get("OPENAI_API_KEY"):
-        print("LIVE RUN BLOCKED: OPENAI_API_KEY is not configured.", file=sys.stderr)
+    if configured_api_provider(args.provider) is None:
+        provider_name = f"{args.provider.upper()}_API_KEY"
+        print(
+            f"LIVE RUN BLOCKED: {provider_name} is not configured.",
+            file=sys.stderr,
+        )
         return 2
 
     try:
-        summary = execute_live_run(args.scenario, args.model)
+        summary = execute_live_run(args.scenario, args.model, provider=args.provider)
     except Exception as exc:
         print(
             f"{type(exc).__name__}: {_safe_error_message(exc)}",

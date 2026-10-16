@@ -19,6 +19,7 @@ from rollouteval.evaluation import (
 )
 from rollouteval.evaluation.grounding import GroundingContext, GroundingEvidenceItem
 from rollouteval.evaluation.evidence import EvidenceId, EvidenceStatus
+from rollouteval.evaluation.providers import GroqGroundednessJudge
 from rollouteval.scenarios import load_scenario
 
 
@@ -137,6 +138,33 @@ def test_request_uses_one_responses_call_and_strict_json_schema() -> None:
             },
         }
     }
+
+
+def test_groq_judge_request_omits_unsupported_store_parameter(monkeypatch) -> None:
+    client = FakeClient(_answer())
+    captured = {}
+
+    def fake_openai(**kwargs):
+        captured.update(kwargs)
+        return client
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
+    monkeypatch.setattr("openai.OpenAI", fake_openai)
+    judge = GroqGroundednessJudge(model="test-model")
+
+    request = _request(judge, client)
+
+    assert captured["base_url"] == "https://api.groq.com/openai/v1"
+    assert "store" not in request
+
+
+def test_injected_groq_judge_client_omits_unsupported_store_parameter() -> None:
+    client = FakeClient(_answer())
+    judge = GroqGroundednessJudge(model="test-model", client=client)
+
+    request = _request(judge, client)
+
+    assert "store" not in request
 
 
 def test_request_serializes_only_safe_context_and_preserves_evidence() -> None:
@@ -291,4 +319,3 @@ def test_context_and_evidence_are_unchanged_after_request_serialization() -> Non
     judge.judge(context)
 
     assert context.model_dump(mode="python") == before
-
