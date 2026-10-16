@@ -191,7 +191,8 @@ cases:
     context:
       task: Reassess metrics after telemetry recovers.
       decision: promote
-      explanation: Metrics were initially unavailable but later became available and showed healthy behavior.
+      explanation: >-
+        Metrics were initially unavailable but later became available. The later observation showed candidate error rate equal to stable and candidate p95 latency close to stable.
       evidence:
         - interaction_index: 0
           evidence_id: service_metrics

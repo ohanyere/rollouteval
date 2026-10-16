@@ -23,7 +23,7 @@ from rollouteval.evaluation.providers.openai import _serialize_context
 ROOT = Path(__file__).resolve().parents[1]
 CALIBRATION_PATH = ROOT / "calibration" / "groundedness_v1.yaml"
 REVIEWS_PATH = ROOT / "calibration" / "groundedness_v1_reviews.yaml"
-_CALIBRATION_SHA256 = "321c6b58a2cbc7bca181b2765b8f6fa03a7dba3532772c3b3fe6e0ab3fd3d596"
+_CALIBRATION_SHA256 = "256762a6fb7f4c00101108c583faa8884614b8edcba5cac18aa3a737134c5007"
 
 
 class RecordingJudge:
@@ -54,7 +54,12 @@ def test_review_yaml_loads_15_approved_records_matching_candidate_distribution()
     assert all(review.decision is GroundednessReviewDecision.APPROVE for review in reviews)
     assert all(review.reviewer == "human-reviewer" for review in reviews)
     assert all(review.reviewer.strip() for review in reviews)
-    assert all(review.reviewed_at == "2026-10-15" for review in reviews)
+    assert all(
+        review.reviewed_at == (
+            "2026-10-16" if review.case_id == "evidence-evolved-to-healthy" else "2026-10-15"
+        )
+        for review in reviews
+    )
     assert all(review.reviewer_rationale.strip() for review in reviews)
     statuses = [review.reviewed_status for review in reviews]
     assert statuses.count(GraderStatus.PASS) == 7

@@ -470,7 +470,7 @@ No runtime event observation is included, so the restart claim lacks support in 
 
 **Final explanation:**
 
-Metrics were initially unavailable but later became available and showed healthy behavior.
+Metrics were initially unavailable but later became available. The later observation showed candidate error rate equal to stable and candidate p95 latency close to stable.
 
 **Observed evidence:**
 

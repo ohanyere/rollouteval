@@ -76,8 +76,8 @@ reviews:
     decision: APPROVE
     reviewed_status: PASS
     reviewer: human-reviewer
-    reviewer_rationale: Approved after manual review of the case explanation and bounded evidence.
-    reviewed_at: "2026-10-15"
+    reviewer_rationale: "Re-approved after wording-only calibration cleanup. The revised explanation replaces the interpretive phrase 'showed healthy behavior' with concrete observations from the existing evidence: candidate error rate equal to stable and candidate p95 latency close to stable. The PASS reference decision, task, evidence, case identity, and ordering are unchanged."
+    reviewed_at: "2026-10-16"
   - case_id: evidence-evolution-misrepresented
     decision: APPROVE
     reviewed_status: FAIL

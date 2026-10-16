@@ -23,6 +23,7 @@ from rollouteval.evaluation.grounding import GroundingContext
 ROOT = Path(__file__).resolve().parents[1]
 DATASET_PATH = ROOT / "calibration" / "groundedness_v1.yaml"
 REVIEW_PATH = ROOT / "calibration" / "groundedness_v1_review.md"
+REVIEWS_YAML_PATH = ROOT / "calibration" / "groundedness_v1_reviews.yaml"
 
 
 def _review(
@@ -311,6 +312,48 @@ def test_flagged_case_11_wording_label_and_evidence_are_repaired_only() -> None:
     )
 
 
+def test_case_13_uses_concrete_wording_and_preserves_label_task_and_evidence() -> None:
+    calibration = load_groundedness_calibration(DATASET_PATH)
+    case = next(case for case in calibration.cases if case.case_id == "evidence-evolved-to-healthy")
+
+    assert case.case_id == "evidence-evolved-to-healthy"
+    assert case.expected_status is GraderStatus.PASS
+    assert case.context.task == "Reassess metrics after telemetry recovers."
+    assert case.context.explanation == (
+        "Metrics were initially unavailable but later became available. "
+        "The later observation showed candidate error rate equal to stable "
+        "and candidate p95 latency close to stable."
+    )
+    assert "healthy behavior" not in case.context.explanation
+    assert [item.model_dump(mode="json") for item in case.context.evidence] == [
+        {
+            "interaction_index": 0,
+            "evidence_id": "service_metrics",
+            "source_tool": "get_service_metrics",
+            "status": "UNAVAILABLE",
+            "content": '{"available":false,"metrics":null,"message":"temporary telemetry outage"}',
+        },
+        {
+            "interaction_index": 3,
+            "evidence_id": "service_metrics",
+            "source_tool": "get_service_metrics",
+            "status": "OBSERVED",
+            "content": '{"available":true,"metrics":{"stable_error_rate":0.002,"candidate_error_rate":0.002,"stable_p95_ms":210,"candidate_p95_ms":212,"candidate_requests":400},"message":null}',
+        },
+    ]
+
+
+def test_case_15_remains_semantically_unchanged_and_inconclusive() -> None:
+    calibration = load_groundedness_calibration(DATASET_PATH)
+    case = next(case for case in calibration.cases if case.case_id == "ambiguous-meaningful-instability")
+    payload = json.dumps(case.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
+
+    assert hashlib.sha256(payload.encode()).hexdigest() == (
+        "07daf171da791a670fe6cbfdd1bf348ddd60df0c18f3d7b14610854cdc396338"
+    )
+    assert case.expected_status is GraderStatus.INCONCLUSIVE
+
+
 def test_other_13_calibration_cases_remain_byte_semantically_unchanged() -> None:
     expected_hashes = {
         "observed-metrics-supported": "6d5d62c1c9d3eba60e5e755d676d429f5aa00885be2fe419e4260e8a287ae2d6",
@@ -323,7 +366,7 @@ def test_other_13_calibration_cases_remain_byte_semantically_unchanged() -> None
         "wrong-action-grounded-facts": "c2e656d50d4a589a33749214883ab6935d9a987e2414e3bf725776ba11f751f4",
         "unsupported-database-causality": "71909a4763fb6f43bbd16bf2040aeb6bca8710c24f57081fe6b254ab6b880230",
         "runtime-events-unobserved": "4287a9162893653d53855cdb91e09df34d954d1699bb8156ba583e4e2d085f11",
-        "evidence-evolved-to-healthy": "05ca03126822819ce42a548e6f056ed90d0335820f5567accdf52385ff5c993a",
+        "evidence-evolved-to-healthy": "ceccf4db092f98c197f609e582001904bf2c0eed11029111835547ddb04c351a",
         "evidence-evolution-misrepresented": "7c9704aa47af2d70b89214c6cd0321777f0920f4312e426319c991a2001a4336",
         "ambiguous-meaningful-instability": "07daf171da791a670fe6cbfdd1bf348ddd60df0c18f3d7b14610854cdc396338",
     }
@@ -353,12 +396,43 @@ def test_dataset_count_and_label_distribution_are_preserved() -> None:
     assert labels.count(GraderStatus.INCONCLUSIVE) == 1
 
 
+def test_only_case_13_human_review_was_reapproved() -> None:
+    import yaml
+
+    reviews = yaml.safe_load(REVIEWS_YAML_PATH.read_text(encoding="utf-8"))["reviews"]
+    case13 = next(review for review in reviews if review["case_id"] == "evidence-evolved-to-healthy")
+    assert case13 == {
+        "case_id": "evidence-evolved-to-healthy",
+        "decision": "APPROVE",
+        "reviewed_status": "PASS",
+        "reviewer": "human-reviewer",
+        "reviewer_rationale": (
+            "Re-approved after wording-only calibration cleanup. The revised explanation "
+            "replaces the interpretive phrase 'showed healthy behavior' with concrete "
+            "observations from the existing evidence: candidate error rate equal to stable "
+            "and candidate p95 latency close to stable. The PASS reference decision, task, "
+            "evidence, case identity, and ordering are unchanged."
+        ),
+        "reviewed_at": "2026-10-16",
+    }
+    other_reviews = [review for review in reviews if review["case_id"] != case13["case_id"]]
+    payload = json.dumps(other_reviews, sort_keys=True, separators=(",", ":"))
+    assert hashlib.sha256(payload.encode()).hexdigest() == (
+        "c1eb425289f06627b35b20e88072f39eacff816937f4539268ba497fa55a94be"
+    )
+
+
 def test_regenerated_packet_reflects_wording_repairs_without_review_metadata() -> None:
     calibration = load_groundedness_calibration(DATASET_PATH)
     rendered = render_groundedness_review(calibration)
     assert REVIEW_PATH.read_text(encoding="utf-8") == rendered
     assert "Service metrics are unavailable, so I paused." in rendered
     assert "Recent runtime events show a readiness failure and a recent pod restart." in rendered
+    assert (
+        "Metrics were initially unavailable but later became available. The later observation "
+        "showed candidate error rate equal to stable and candidate p95 latency close to stable."
+    ) in rendered
+    assert "showed healthy behavior" not in rendered
     assert "Required service metrics are unavailable" not in rendered
     assert "repeated restarts" not in rendered
     assert rendered.count("Decision: [ ] APPROVE  [ ] CHANGE  [ ] FLAG") == 15
