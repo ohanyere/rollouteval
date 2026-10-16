@@ -76,6 +76,9 @@ def test_groq_groundedness_judge_validates_all_statuses(status):
     judge = GroqGroundednessJudge(model="judge-model", client=client)
 
     assert isinstance(judge, GroundednessJudge)
+    assert judge.provider_name == "groq"
+    assert judge.model == "judge-model"
+    assert len(judge.prompt_sha256) == 64
     result = judge.judge(_grounding_context())
     assert isinstance(result, GroundednessJudgment)
     assert result.status.value == status

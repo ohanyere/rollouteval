@@ -169,6 +169,59 @@ def _statuses(observable: ObservableRun):
     )
 
 
+class ScriptedGroundednessJudge:
+    provider_name = "test-provider"
+    model = "test-judge"
+    prompt_sha256 = "a" * 64
+
+    def __init__(
+        self,
+        status=GraderStatus.PASS,
+        reason="Supported by observed evidence.",
+        error=None,
+    ):
+        from rollouteval.evaluation import GroundednessJudgment
+
+        self.judgment = GroundednessJudgment(status=status, reason=reason)
+        self.error = error
+        self.contexts = []
+
+    def judge(self, context):
+        self.contexts.append(context)
+        if self.error is not None:
+            raise self.error
+        return self.judgment
+
+
+def _execute_with_judge(
+    scenario_id,
+    judge,
+    *,
+    decision=None,
+    explanation="Observed rollout evidence supports this explanation.",
+):
+    scenario = _scenario(scenario_id)
+    environment = RolloutEnvironment(scenario)
+    outputs = [
+        _call(EVIDENCE_TO_TOOL[item]) for item in scenario.required_evidence
+    ]
+    selected_decision = decision or scenario.expected_decision
+    outputs.append(_call(DECISION_TO_TOOL[selected_decision]))
+    outputs.append(_call(AgentToolName.GET_ROLLOUT_STATE))
+    outputs.append(_answer(selected_decision, explanation))
+    model = ScriptedModel([_response(output) for output in outputs])
+    runner, _, _, _ = _make_runner(scenario, model, environment=environment)
+    trace_recorder = TraceRecorder("groundedness-run", scenario.id)
+    result = ObservableRunOrchestrator().execute(
+        scenario=scenario,
+        runner=runner,
+        environment=environment,
+        trace_recorder=trace_recorder,
+        groundedness_judge=judge,
+    )
+    return result
+
+
 def test_observable_run_has_exact_five_artifact_fields_and_is_frozen() -> None:
     assert set(ObservableRun.model_fields) == {
         "agent_run",
@@ -194,6 +247,94 @@ def test_canonical_run_constructs_safe_task_and_completes_trace() -> None:
     assert observable.trace.scenario_id == scenario.id
     with pytest.raises(ValidationError):
         observable.trace = observable.trace
+
+
+def test_normal_run_persists_groundedness_provenance_and_reads_it_back() -> None:
+    judge = ScriptedGroundednessJudge()
+    observable = _execute_with_judge("healthy-canary", judge)
+
+    criterion = observable.evaluation.groundedness
+    assert criterion is not None
+    assert criterion.status is GraderStatus.PASS
+    assert criterion.reason == "Supported by observed evidence."
+    assert criterion.grader == "groundedness"
+    assert criterion.evaluator_version == "1"
+    assert criterion.criterion_id == "groundedness"
+    assert criterion.evidence_references
+    assert criterion.judge_provider == "test-provider"
+    assert criterion.judge_model == "test-judge"
+    assert criterion.prompt_sha256 == "a" * 64
+    assert observable.evaluation.decision.status is GraderStatus.PASS
+    restored = ObservableRun.model_validate_json(observable.model_dump_json())
+    restored_criterion = restored.evaluation.groundedness
+    assert restored_criterion == criterion
+    assert restored.trace.run_id == observable.trace.run_id
+    assert restored.trace.scenario_id == observable.trace.scenario_id
+
+
+def test_unsupported_claim_failure_is_reported_in_normal_evaluation() -> None:
+    judge = ScriptedGroundednessJudge(
+        GraderStatus.FAIL,
+        "The claimed outage is absent from the supplied observations.",
+    )
+    observable = _execute_with_judge(
+        "healthy-canary",
+        judge,
+        explanation="The database outage caused the rollout failure.",
+    )
+
+    assert observable.evaluation.groundedness.status is GraderStatus.FAIL
+    reportable = ObservableRun.model_validate_json(observable.model_dump_json())
+    assert reportable.evaluation.groundedness.reason.startswith("The claimed outage")
+
+
+def test_insufficient_evidence_keeps_inconclusive_judgment() -> None:
+    judge = ScriptedGroundednessJudge(
+        GraderStatus.INCONCLUSIVE,
+        "The supplied evidence is insufficient to decide.",
+    )
+    observable = _execute_with_judge(
+        "telemetry-unavailable",
+        judge,
+        explanation="Service metrics were unavailable in the observed response.",
+    )
+
+    assert observable.evaluation.groundedness.status is GraderStatus.INCONCLUSIVE
+    assert len(judge.contexts) == 1
+    assert any(item.status.value == "UNAVAILABLE" for item in judge.contexts[0].evidence)
+    assert set(judge.contexts[0].model_fields_set) == {
+        "task",
+        "decision",
+        "explanation",
+        "evidence",
+    }
+
+
+def test_groundedness_pass_does_not_override_objective_failure() -> None:
+    observable = _execute_with_judge(
+        "degraded-canary",
+        ScriptedGroundednessJudge(),
+        decision=Decision.PROMOTE,
+    )
+
+    assert observable.evaluation.groundedness.status is GraderStatus.PASS
+    assert observable.evaluation.decision.status is GraderStatus.FAIL
+    assert observable.evaluation.groundedness not in observable.evaluation.results()[:6]
+
+
+def test_provider_failure_is_inconclusive_and_preserves_objective_results() -> None:
+    observable = _execute_with_judge(
+        "healthy-canary",
+        ScriptedGroundednessJudge(error=RuntimeError("provider unavailable")),
+    )
+
+    groundedness = observable.evaluation.groundedness
+    assert groundedness.status is GraderStatus.INCONCLUSIVE
+    assert groundedness.judge_error == "RuntimeError"
+    assert groundedness.judge_provider == "test-provider"
+    assert observable.evaluation.decision.status is GraderStatus.PASS
+    restored = ObservableRun.model_validate_json(observable.model_dump_json())
+    assert restored.evaluation == observable.evaluation
 
 
 def test_trace_scenario_mismatch_fails_before_model_execution() -> None:

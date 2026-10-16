@@ -17,3 +17,10 @@ class GraderResult(BaseModel):
     grader: str = Field(min_length=1)
     status: GraderStatus
     reason: str = Field(min_length=1)
+    evaluator_version: str = "1"
+    criterion_id: str | None = None
+    evidence_references: tuple[str, ...] = ()
+    judge_provider: str | None = None
+    judge_model: str | None = None
+    prompt_sha256: str | None = None
+    judge_error: str | None = None

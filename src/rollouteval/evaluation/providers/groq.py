@@ -1,10 +1,12 @@
 """Groq Responses API implementation of the groundedness judge interface."""
 
+import hashlib
 from typing import Any
 
 from rollouteval.evaluation.groundedness import GroundednessJudgment
 from rollouteval.evaluation.grounding import GroundingContext
 from rollouteval.evaluation.providers.openai import (
+    GROUNDEDNESS_INSTRUCTIONS,
     GroundednessJudgeResponseError,
     OpenAIGroundednessJudge,
 )
@@ -30,6 +32,11 @@ class GroqGroundednessJudge:
             raise ValueError("model must be a non-empty string")
         if client is None:
             client, _ = create_api_client("groq")
+        self.model = model.strip()
+        self.provider_name = "groq"
+        self.prompt_sha256 = hashlib.sha256(
+            GROUNDEDNESS_INSTRUCTIONS.encode()
+        ).hexdigest()
         self._delegate = OpenAIGroundednessJudge(
             model=model,
             client=_GroqResponsesClient(client),

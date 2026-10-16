@@ -89,6 +89,8 @@ def test_judge_accepts_model_and_structurally_satisfies_protocol() -> None:
     judge, _ = _judge()
 
     assert judge.model == "judge-model"
+    assert judge.provider_name == "openai"
+    assert len(judge.prompt_sha256) == 64
     assert isinstance(judge, GroundednessJudge)
 
 

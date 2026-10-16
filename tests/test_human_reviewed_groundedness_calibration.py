@@ -382,6 +382,7 @@ def test_existing_artifact_contracts_remain_separate() -> None:
         "trajectory",
         "safety",
         "abstention",
+        "groundedness",
     }
     assert set(ObservableRun.model_fields) == {
         "agent_run",
@@ -390,5 +391,4 @@ def test_existing_artifact_contracts_remain_separate() -> None:
         "evaluation",
         "cost_estimate",
     }
-    assert "groundedness" not in DeterministicEvaluation.model_fields
     assert "reviewed_status" not in GroundingContext.model_fields

@@ -363,7 +363,7 @@ def test_malformed_evidence_fails_before_judge_is_called() -> None:
     assert judge.contexts == []
 
 
-def test_deterministic_evaluation_remains_six_criteria_without_judge_integration(monkeypatch) -> None:
+def test_deterministic_evaluation_keeps_groundedness_opt_in_without_a_judge(monkeypatch) -> None:
     import rollouteval.evaluation.groundedness as groundedness_module
 
     assert set(DeterministicEvaluation.model_fields) == {
@@ -373,6 +373,7 @@ def test_deterministic_evaluation_remains_six_criteria_without_judge_integration
         "trajectory",
         "safety",
         "abstention",
+        "groundedness",
     }
     scenario = _scenario()
     run_result = _run()
@@ -388,6 +389,7 @@ def test_deterministic_evaluation_remains_six_criteria_without_judge_integration
     )
 
     assert len(evaluation.results()) == 6
+    assert evaluation.groundedness is None
 
 
 def test_grader_does_not_mutate_scenario_run_result_or_received_context() -> None:

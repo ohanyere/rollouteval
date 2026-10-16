@@ -1,5 +1,6 @@
 """OpenAI Responses API adapter for bounded groundedness judgments."""
 
+import hashlib
 import json
 from typing import Any
 
@@ -46,6 +47,10 @@ class OpenAIGroundednessJudge:
         if not isinstance(model, str) or not model.strip():
             raise ValueError("model must be a non-empty string")
         self.model = model.strip()
+        self.provider_name = "openai"
+        self.prompt_sha256 = hashlib.sha256(
+            GROUNDEDNESS_INSTRUCTIONS.encode()
+        ).hexdigest()
         if client is None:
             from openai import OpenAI
 

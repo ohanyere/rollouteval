@@ -9,6 +9,8 @@ from rollouteval.domain.scenario import Scenario
 from rollouteval.evaluation.grounding import GroundingContext, build_grounding_context
 from rollouteval.evaluation.results import GraderResult, GraderStatus
 
+GROUNDEDNESS_EVALUATOR_VERSION = "1"
+
 
 class GroundednessJudgment(BaseModel):
     """Structured semantic judgment about explanation support in observed evidence."""
@@ -42,4 +44,13 @@ class GroundednessGrader:
             grader="groundedness",
             status=judgment.status,
             reason=judgment.reason,
+            evaluator_version=GROUNDEDNESS_EVALUATOR_VERSION,
+            criterion_id="groundedness",
+            evidence_references=tuple(
+                f"{item.evidence_id.value}@{item.interaction_index}"
+                for item in context.evidence
+            ),
+            judge_provider=getattr(self._judge, "provider_name", None),
+            judge_model=getattr(self._judge, "model", None),
+            prompt_sha256=getattr(self._judge, "prompt_sha256", None),
         )

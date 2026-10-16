@@ -10,6 +10,7 @@ from rollouteval.evaluation.engine import (
     DeterministicEvaluation,
     DeterministicEvaluationEngine,
 )
+from rollouteval.evaluation.groundedness import GroundednessJudge
 from rollouteval.observability.cost import (
     CostEstimator,
     PricingSnapshot,
@@ -50,6 +51,7 @@ class ObservableRunOrchestrator:
         environment: RolloutEnvironment,
         trace_recorder: TraceRecorder,
         pricing: PricingSnapshot | None = None,
+        groundedness_judge: GroundednessJudge | None = None,
     ) -> ObservableRun:
         """Execute one run, capture independent artifacts, then evaluate them."""
         trace_identity = trace_recorder.snapshot()
@@ -66,6 +68,7 @@ class ObservableRunOrchestrator:
             scenario,
             agent_run,
             runtime_snapshot,
+            groundedness_judge=groundedness_judge,
         )
         cost_estimate = CostEstimator().estimate(trace, pricing) if pricing is not None else None
         return ObservableRun(

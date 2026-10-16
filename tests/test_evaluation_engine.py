@@ -152,6 +152,7 @@ def test_result_contract_contains_six_named_criterion_results_and_is_immutable()
         "trajectory",
         "safety",
         "abstention",
+        "groundedness",
     }
     assert len(evaluation.results()) == 6
     assert evaluation.decision.grader == "decision"
@@ -178,6 +179,7 @@ def test_engine_returns_evaluation_and_runs_all_six_criteria():
         "safety",
         "abstention",
     ]
+    assert evaluation.groundedness is None
 
 
 def test_decision_fail_does_not_short_circuit_later_criteria():
@@ -436,4 +438,3 @@ def test_evaluation_contract_has_no_aggregate_status_or_score():
 
     assert "overall_status" not in fields
     assert "score" not in fields
-
