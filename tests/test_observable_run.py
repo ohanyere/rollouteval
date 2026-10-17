@@ -225,6 +225,7 @@ def _execute_with_judge(
 def test_observable_run_has_exact_five_artifact_fields_and_is_frozen() -> None:
     assert set(ObservableRun.model_fields) == {
         "agent_run",
+        "task",
         "runtime_snapshot",
         "trace",
         "evaluation",
@@ -335,6 +336,28 @@ def test_provider_failure_is_inconclusive_and_preserves_objective_results() -> N
     assert observable.evaluation.decision.status is GraderStatus.PASS
     restored = ObservableRun.model_validate_json(observable.model_dump_json())
     assert restored.evaluation == observable.evaluation
+
+
+def test_normal_orchestration_persists_and_reports_groundedness_end_to_end(tmp_path) -> None:
+    from rollouteval.run_artifacts import RunArtifactStore, RunReportService
+
+    judge = ScriptedGroundednessJudge()
+    observable = _execute_with_judge("healthy-canary", judge)
+    store = RunArtifactStore(tmp_path / "run-artifacts")
+    store.save(observable)
+
+    restored = store.load(observable.trace.run_id)
+    report = RunReportService(store).get(observable.trace.run_id)
+    criterion = next(item for item in report.criteria if item.criterion_id == "groundedness")
+
+    assert restored.evaluation == observable.evaluation
+    assert restored.trace.run_id == report.run_id
+    assert restored.trace.scenario_id == report.scenario_id
+    assert criterion.status is GraderStatus.PASS
+    assert criterion.provider == "test-provider"
+    assert criterion.model == "test-judge"
+    assert criterion.evidence_references == observable.evaluation.groundedness.evidence_references
+    assert criterion.prompt_sha256 == "a" * 64
 
 
 def test_trace_scenario_mismatch_fails_before_model_execution() -> None:

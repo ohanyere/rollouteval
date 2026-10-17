@@ -386,6 +386,7 @@ def test_existing_artifact_contracts_remain_separate() -> None:
     }
     assert set(ObservableRun.model_fields) == {
         "agent_run",
+        "task",
         "runtime_snapshot",
         "trace",
         "evaluation",

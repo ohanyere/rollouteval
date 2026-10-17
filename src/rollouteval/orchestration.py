@@ -29,6 +29,7 @@ class ObservableRun(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     agent_run: AgentRunResult
+    task: AgentTask
     runtime_snapshot: InitialEnvironment
     trace: RunTrace
     evaluation: DeterministicEvaluation
@@ -73,6 +74,7 @@ class ObservableRunOrchestrator:
         cost_estimate = CostEstimator().estimate(trace, pricing) if pricing is not None else None
         return ObservableRun(
             agent_run=agent_run,
+            task=task,
             runtime_snapshot=runtime_snapshot,
             trace=trace,
             evaluation=evaluation,
