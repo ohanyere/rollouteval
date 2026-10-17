@@ -144,3 +144,54 @@ Local command agents are **not a security sandbox**: they can access resources
 permitted to the operating-system user, including filesystem and network access.
 Use only trusted local code until a separate sandboxed execution boundary is
 available.
+
+## Remote HTTP agents
+
+A remote service can expose the same version-1 request/response protocol. The
+HTTP adapter uses Python's standard library; it POSTs JSON, requires a JSON
+content type, applies a timeout and response limit, and does not follow
+redirects. Endpoint URLs must use HTTP or HTTPS and cannot contain embedded
+credentials. Bearer authentication is provided separately at runtime:
+
+```python
+import os
+
+from rollouteval.agent.remote import RemoteAgentSpec, build_remote_agent
+from rollouteval.benchmark import (
+    BenchmarkArtifactStore,
+    BenchmarkReportService,
+    BenchmarkRunner,
+    BenchmarkSpec,
+)
+from rollouteval.run_artifacts import RunArtifactStore
+from rollouteval.scenarios import load_scenario
+
+agent = build_remote_agent(
+    RemoteAgentSpec(
+        agent_id="hosted-rollout-agent",
+        version="2.1",
+        implementation_sha256="fedcba9876543210" * 4,
+        endpoint_url="https://agent.example.test/rollouteval/v1/respond",
+    ),
+    bearer_token=os.environ["REMOTE_AGENT_TOKEN"],
+)
+benchmark = BenchmarkSpec(
+    benchmark_id="canary-core",
+    version="1",
+    tasks=(load_scenario("scenarios/healthy-canary.yaml"),),
+)
+run_store = RunArtifactStore("./run-artifacts")
+benchmark_store = BenchmarkArtifactStore("./benchmark-artifacts")
+result = BenchmarkRunner(run_store, benchmark_store).run(agent, benchmark)
+report = BenchmarkReportService(benchmark_store, run_store).get(
+    result.benchmark_run_id
+)
+```
+
+The bearer token remains runtime-only and is not part of agent identity or
+artifacts. Endpoint URLs are also omitted from persisted provenance to avoid
+retaining sensitive query parameters. Redirects are rejected rather than
+followed, preventing credential forwarding to a redirect target. Remote HTTP
+connectivity is **not a security sandbox or trust boundary**; response data is
+validated as untrusted structured input, but Stage 7C does not provide network
+isolation or comprehensive SSRF protection.

@@ -108,6 +108,37 @@ class ExternalAgentResponse(BaseModel):
     response: AgentModelResponse
 
 
+def encode_external_agent_request(
+    request: ExternalAgentRequest, *, max_bytes: int
+) -> bytes:
+    """Serialize the shared external-agent request within its byte bound."""
+    payload = request.model_dump_json(exclude_none=False, by_alias=False).encode("utf-8") + b"\n"
+    if len(payload) > max_bytes:
+        raise ExternalAgentRequestLimitError()
+    return payload
+
+
+def decode_external_agent_response(
+    payload: bytes, *, protocol_version: int = EXTERNAL_AGENT_PROTOCOL_VERSION
+) -> AgentModelResponse:
+    """Decode and validate the shared subprocess/HTTP response contract."""
+    try:
+        value = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExternalAgentMalformedJSONError() from exc
+    if not isinstance(value, dict):
+        raise InvalidExternalAgentResponseError()
+    returned_version = value.get("protocol_version")
+    if returned_version is None:
+        raise InvalidExternalAgentResponseError()
+    if type(returned_version) is not int or returned_version != protocol_version:
+        raise UnsupportedExternalAgentProtocolError()
+    try:
+        return ExternalAgentResponse.model_validate(value).response
+    except ValidationError as exc:
+        raise InvalidExternalAgentResponseError() from exc
+
+
 class ExternalAgentError(AgentExecutionError):
     """Base safe failure class for local external-agent execution."""
 
@@ -291,26 +322,13 @@ class _SubprocessAgentModel(AgentModel):
             task=task.task,
             interactions=interactions,
         )
-        request_bytes = (
-            request.model_dump_json(exclude_none=False, by_alias=False).encode("utf-8")
-            + b"\n"
+        request_bytes = encode_external_agent_request(
+            request, max_bytes=self._spec.max_request_bytes
         )
         stdout = _run_command(self._spec, request_bytes)
-        try:
-            value = json.loads(stdout.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ExternalAgentMalformedJSONError() from exc
-        if not isinstance(value, dict):
-            raise InvalidExternalAgentResponseError()
-        protocol_version = value.get("protocol_version")
-        if protocol_version is None:
-            raise InvalidExternalAgentResponseError()
-        if type(protocol_version) is not int or protocol_version != self._spec.protocol_version:
-            raise UnsupportedExternalAgentProtocolError()
-        try:
-            return ExternalAgentResponse.model_validate(value).response
-        except ValidationError as exc:
-            raise InvalidExternalAgentResponseError() from exc
+        return decode_external_agent_response(
+            stdout, protocol_version=self._spec.protocol_version
+        )
 
 
 class _RunCorrelatedAgentExecutor(AgentRunExecutor):
