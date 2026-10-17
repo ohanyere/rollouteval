@@ -3,7 +3,7 @@
 from pydantic import BaseModel, ConfigDict
 
 from rollouteval.agent.contracts import AgentRunResult, AgentTask
-from rollouteval.agent.runner import AgentRunner
+from rollouteval.agent.runner import AgentRunExecutor
 from rollouteval.domain.scenario import InitialEnvironment, Scenario
 from rollouteval.environment import RolloutEnvironment
 from rollouteval.evaluation.engine import (
@@ -48,7 +48,7 @@ class ObservableRunOrchestrator:
         self,
         *,
         scenario: Scenario,
-        runner: AgentRunner,
+        runner: AgentRunExecutor,
         environment: RolloutEnvironment,
         trace_recorder: TraceRecorder,
         pricing: PricingSnapshot | None = None,

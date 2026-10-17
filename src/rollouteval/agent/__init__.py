@@ -13,6 +13,7 @@ from rollouteval.agent.contracts import (
 )
 from rollouteval.agent.runner import (
     AgentModel,
+    AgentRunExecutor,
     AgentRunner,
     AgentStepLimitExceeded,
     RolloutToolDispatcher,
@@ -24,6 +25,7 @@ __all__ = [
     "AgentOutput",
     "AgentRunResult",
     "AgentModel",
+    "AgentRunExecutor",
     "AgentRunner",
     "AgentStepLimitExceeded",
     "AgentTask",

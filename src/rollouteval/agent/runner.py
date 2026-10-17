@@ -32,6 +32,19 @@ class AgentModel(Protocol):
         ...
 
 
+class AgentRunExecutor(Protocol):
+    """Provider-neutral execution interface consumed by orchestration."""
+
+    def run(
+        self,
+        task: AgentTask,
+        *,
+        trace_recorder: TraceRecorder | None = None,
+    ) -> AgentRunResult:
+        """Return a completed agent result or raise an execution error."""
+        ...
+
+
 class AgentStepLimitExceeded(RuntimeError):
     """Raised when no final answer is produced within the configured steps."""
 
