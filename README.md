@@ -195,3 +195,48 @@ followed, preventing credential forwarding to a redirect target. Remote HTTP
 connectivity is **not a security sandbox or trust boundary**; response data is
 validated as untrusted structured input, but Stage 7C does not provide network
 isolation or comprehensive SSRF protection.
+
+## Command-line workflow
+
+Install RolloutEval in an environment and use the `rollouteval` command (or
+`python -m rollouteval.cli`). Configuration defaults to
+`$XDG_CONFIG_HOME/rollouteval` (normally `~/.config/rollouteval`); artifacts
+default to `$XDG_DATA_HOME/rollouteval/artifacts`. Override either with global
+`--config-dir` and `--artifact-dir` options placed before the command.
+
+Import ordered scenario YAML files into a local benchmark definition, then
+configure an argv-based subprocess agent:
+
+```sh
+rollouteval --config-dir ./.rollouteval/config --artifact-dir ./.rollouteval/data \
+  benchmark add --id rollout-safety --version 1 \
+  --scenario scenarios/healthy-canary.yaml --scenario scenarios/degraded-canary.yaml
+
+rollouteval --config-dir ./.rollouteval/config agent add-subprocess \
+  --id candidate --version 1.0 --implementation-sha256 <64-hex-digest> \
+  --executable python --arg ./agent.py --working-directory .
+rollouteval --config-dir ./.rollouteval/config agent list
+rollouteval --config-dir ./.rollouteval/config benchmark list
+rollouteval --config-dir ./.rollouteval/config benchmark show rollout-safety
+rollouteval --config-dir ./.rollouteval/config --artifact-dir ./.rollouteval/data \
+  benchmark run --agent candidate --benchmark rollout-safety --trials-per-task 1
+rollouteval --artifact-dir ./.rollouteval/data report list
+rollouteval --artifact-dir ./.rollouteval/data report show <benchmark-run-id>
+rollouteval --artifact-dir ./.rollouteval/data run show <trial-run-id>
+```
+
+Use `--arg` once for each argv element; no shell parsing or interpolation is
+performed. For remote agents, use `agent add-remote --endpoint https://...` and
+optionally `--token-env REMOTE_AGENT_TOKEN`. Only the environment-variable
+name is saved; the token value is resolved at benchmark execution time and is
+never written to configuration or artifacts. Subprocess `--allow-env NAME`
+also saves only a name and explicitly passes its runtime value to the child.
+Do not put credentials in command arguments or endpoint URLs.
+
+`agent`, `benchmark`, `run`, and `report` commands support `--json` for stable
+machine-readable output. `benchmark add` validates each scenario at import;
+task order follows the order of repeated `--scenario` options. Benchmark
+reports keep criteria independent and do not invent an overall pass/fail
+verdict. An evaluated criterion FAIL is still a successfully completed CLI
+benchmark run. See `rollouteval --help` and each subcommand's `--help` for the
+complete command reference.
