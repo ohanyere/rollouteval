@@ -47,6 +47,18 @@ class AgentIdentity(BaseModel):
     agent_id: str = Field(min_length=1, max_length=128)
     version: str = Field(min_length=1, max_length=128)
     implementation_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    connection_type: Literal["in_process", "local_subprocess"] = "in_process"
+    protocol_version: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_connection_provenance(self) -> "AgentIdentity":
+        if (self.connection_type == "local_subprocess") != (
+            self.protocol_version is not None
+        ):
+            raise ValueError(
+                "local subprocess identities require a protocol version"
+            )
+        return self
 
 
 class BenchmarkSpec(BaseModel):

@@ -83,3 +83,64 @@ after an execution failure. Every completed trial has its own normal run
 artifact; the benchmark artifact stores identities, references, and criterion
 counts, not copied run payloads. Reports retain each criterion independently
 and do not invent an aggregate pass/fail verdict.
+
+## External local-command agents
+
+An external agent can implement the version-1 JSON protocol without importing
+RolloutEval. RolloutEval starts its configured argv directly (never through a
+shell), sends one JSON request on stdin for each agent turn, and expects one
+JSON response on stdout. The response wraps the existing agent output shape:
+
+```json
+{"protocol_version":1,"response":{"output":{"kind":"final","decision":"promote","explanation":"Observed metrics remain within the rollout limits."}}}
+```
+
+The request includes `protocol_version`, `request_id`, `scenario_id`, `run_id`,
+the agent-visible task text, and prior tool interactions. It excludes expected
+answers and evaluator reference truth. Tool calls use the same `kind`, `tool`,
+and `arguments` fields as the in-process agent contract. Each turn starts a
+fresh command process; RolloutEval's existing runner handles tool dispatch and
+subsequent turns.
+
+```python
+import sys
+
+from rollouteval.agent.external import ExternalAgentSpec, build_external_agent
+from rollouteval.benchmark import (
+    BenchmarkArtifactStore,
+    BenchmarkReportService,
+    BenchmarkRunner,
+    BenchmarkSpec,
+)
+from rollouteval.run_artifacts import RunArtifactStore
+from rollouteval.scenarios import load_scenario
+
+agent = build_external_agent(ExternalAgentSpec(
+    agent_id="my-rollout-agent",
+    version="1.0.0",
+    implementation_sha256="0123456789abcdef" * 4,
+    command=(sys.executable, "./my_agent.py"),
+    working_directory=".",
+    timeout_seconds=20,
+))
+benchmark = BenchmarkSpec(
+    benchmark_id="canary-core",
+    version="1",
+    tasks=(load_scenario("scenarios/healthy-canary.yaml"),),
+)
+run_store = RunArtifactStore("./run-artifacts")
+benchmark_store = BenchmarkArtifactStore("./benchmark-artifacts")
+result = BenchmarkRunner(run_store, benchmark_store).run(agent, benchmark)
+report = BenchmarkReportService(benchmark_store, run_store).get(
+    result.benchmark_run_id
+)
+```
+
+Only variables explicitly listed in `ExternalAgentSpec.environment` are passed
+to the child; the parent environment is not inherited. Configure a digest for
+the complete agent implementation (not merely the Python launcher). Connection
+commands and environment values are not part of the persisted agent identity.
+Local command agents are **not a security sandbox**: they can access resources
+permitted to the operating-system user, including filesystem and network access.
+Use only trusted local code until a separate sandboxed execution boundary is
+available.

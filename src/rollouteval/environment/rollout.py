@@ -11,10 +11,16 @@ class RolloutEnvironment:
     """Own an isolated runtime copy of a scenario's initial environment."""
 
     def __init__(self, scenario: Scenario) -> None:
+        self._scenario_id = scenario.id
         self._baseline = scenario.initial_environment.model_copy(deep=True)
         self._state = self._baseline.model_copy(deep=True)
         self._max_mutations = scenario.max_mutations
         self._mutation_count = 0
+
+    @property
+    def scenario_id(self) -> str:
+        """Return the stable identity of the scenario initializing this runtime."""
+        return self._scenario_id
 
     @property
     def mutation_count(self) -> int:
